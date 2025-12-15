@@ -17,7 +17,7 @@ Architecture: Centralized Consult Pattern
 - Codex/Gemini/Claude CLI = Consultants (text advice only)
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from .config import ZenConfig
 from .providers import CodexProvider, GeminiProvider, ClaudeProvider, ProviderRegistry
@@ -38,6 +38,11 @@ from .maker import (
 from .skills import (
     SkillManifest, DynamicToolRegistry, SkillSession, SkillLoader,
     create_skill_session,
+)
+from .coordination import (
+    CoordinationTopology, TaskStructureFeatures, CoordinationDecision,
+    CoordinationMetrics, MetricsTracker, ArchitectureSelectionEngine,
+    TaskStructureClassifier, DegradationStrategy, CoordinationPolicy,
 )
 
 __all__ = [
@@ -82,4 +87,14 @@ __all__ = [
     "SkillSession",
     "SkillLoader",
     "create_skill_session",
+    # Coordination (Architecture Selection Engine)
+    "CoordinationTopology",
+    "TaskStructureFeatures",
+    "CoordinationDecision",
+    "CoordinationMetrics",
+    "MetricsTracker",
+    "ArchitectureSelectionEngine",
+    "TaskStructureClassifier",
+    "DegradationStrategy",
+    "CoordinationPolicy",
 ]

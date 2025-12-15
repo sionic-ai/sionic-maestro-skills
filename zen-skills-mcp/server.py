@@ -54,6 +54,12 @@ from zen.skills import (
     SkillManifest, SkillDefinition, DynamicToolRegistry, ToolLoadState,
     SkillSession, SkillLoader, create_skill_session, get_recommended_tools_for_task,
 )
+from zen.coordination import (
+    CoordinationTopology, TaskStructureFeatures, CoordinationDecision,
+    CoordinationMetrics, MetricsTracker, ArchitectureSelectionEngine,
+    TaskStructureClassifier, DegradationStrategy, CoordinationPolicy,
+    compute_redundancy, estimate_error_amplification,
+)
 
 
 # ============================================================================
@@ -169,6 +175,16 @@ skill_session = SkillSession(skill_manifest, tool_registry)
 skill_loader = SkillLoader(str(BASE_DIR))
 red_flagger = RedFlagger()
 calibrator = Calibrator(red_flagger)
+
+# Initialize Coordination components (Architecture Selection Engine)
+coordination_policy = CoordinationPolicy()
+metrics_tracker = MetricsTracker()
+architecture_engine = ArchitectureSelectionEngine(
+    metrics_tracker=metrics_tracker,
+    default_topology=CoordinationTopology.SAS,
+)
+task_classifier = TaskStructureClassifier()
+degradation_strategy = DegradationStrategy()
 
 
 # ============================================================================
@@ -2065,6 +2081,472 @@ def zen_exit_stage() -> Dict[str, Any]:
         "message": "Stage exited, tools unloaded to core set",
         "loaded_tools": state["loaded_tools"],
         "context_cost": state["context_cost"],
+    }
+
+
+# ============================================================================
+# TOOL: zen_classify_task - Analyze task structure for architecture selection
+# ============================================================================
+
+@mcp.tool()
+def zen_classify_task(
+    task_description: str,
+    code_context: Optional[str] = None,
+    error_logs: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Classify task structure to determine optimal coordination topology.
+
+    Paper Rule A: "Domain/task structure dependency is absolute"
+    This tool analyzes the task to extract features that determine
+    whether to use MAS (multi-agent) or SAS (single-agent).
+
+    Key features extracted:
+    - decomposability_score: Can task be split into parallel subtasks?
+    - sequential_dependency_score: How much does each step depend on previous?
+    - tool_complexity: How many/complex tools are needed?
+
+    Use this FIRST in Stage 1 (Analyze) to inform architecture selection
+    for subsequent stages.
+
+    Args:
+        task_description: Description of the task/problem.
+        code_context: Optional code snippets for context.
+        error_logs: Optional error logs or stack traces.
+
+    Returns:
+        TaskStructureFeatures with scores and recommendations.
+    """
+    features = task_classifier.classify(
+        task_description=task_description,
+        code_context=code_context,
+        error_logs=error_logs,
+    )
+
+    # Get architecture recommendation
+    decision = architecture_engine.select_architecture(features)
+
+    return {
+        "ok": True,
+        "features": {
+            "decomposability_score": features.decomposability_score,
+            "sequential_dependency_score": features.sequential_dependency_score,
+            "tool_complexity": features.tool_complexity,
+            "domain": features.domain,
+            "baseline_single_agent_success": features.baseline_single_agent_success,
+        },
+        "metadata": features.metadata,
+        "recommended_topology": decision.topology.value,
+        "topology_confidence": decision.confidence,
+        "topology_rationale": decision.rationale,
+        "paper_rule_applied": (
+            "Rule B: Sequential → SAS" if features.sequential_dependency_score > 0.7
+            else "Rule B: Decomposable → MAS" if features.decomposability_score > 0.6
+            else "Rule A: Domain-specific default"
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: zen_select_architecture - Select coordination topology for a stage
+# ============================================================================
+
+@mcp.tool()
+def zen_select_architecture(
+    stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
+    decomposability_score: float = 0.5,
+    sequential_dependency_score: float = 0.5,
+    tool_complexity: float = 0.3,
+    force_topology: Optional[Literal["sas", "mas_independent", "mas_centralized"]] = None,
+) -> Dict[str, Any]:
+    """
+    Select the optimal coordination topology for a workflow stage.
+
+    Paper Rules Applied:
+    - Rule A: Architecture depends on task structure
+    - Rule B: Decomposable → MAS, Sequential → SAS
+    - Rule C: Coordination overhead is a cost to minimize
+    - Rule D: Use calibration data when available
+
+    The selected topology determines:
+    - How many agents to use
+    - How they communicate
+    - When to fall back to simpler topology
+
+    Args:
+        stage: Current workflow stage.
+        decomposability_score: 0-1, how parallelizable is the task.
+        sequential_dependency_score: 0-1, how sequential are dependencies.
+        tool_complexity: 0-1, how complex is tool usage.
+        force_topology: Optional override ("sas", "mas_independent", "mas_centralized").
+
+    Returns:
+        CoordinationDecision with topology, parameters, and fallback plan.
+    """
+    features = TaskStructureFeatures(
+        decomposability_score=decomposability_score,
+        sequential_dependency_score=sequential_dependency_score,
+        tool_complexity=tool_complexity,
+    )
+
+    # Parse force_topology
+    forced = None
+    if force_topology:
+        topology_map = {
+            "sas": CoordinationTopology.SAS,
+            "mas_independent": CoordinationTopology.MAS_INDEPENDENT,
+            "mas_centralized": CoordinationTopology.MAS_CENTRALIZED,
+        }
+        forced = topology_map.get(force_topology)
+
+    decision = architecture_engine.select_architecture(
+        features=features,
+        stage=stage,
+        force_topology=forced,
+    )
+
+    # Get stage-specific recommendations
+    stage_rec = architecture_engine.get_stage_recommendation(stage, features)
+
+    return {
+        "ok": True,
+        "topology": decision.topology.value,
+        "confidence": decision.confidence,
+        "rationale": decision.rationale,
+        "parameters": {
+            "max_agents": decision.max_agents,
+            "max_rounds": decision.max_rounds,
+            "max_messages_per_agent": decision.max_messages_per_agent,
+            "overhead_threshold": decision.overhead_threshold,
+        },
+        "fallback_topology": decision.fallback_topology.value if decision.fallback_topology else None,
+        "stage_recommendations": stage_rec,
+        "paper_insight": (
+            "Debug stage forced to SAS - paper shows MAS degrades in sequential tasks"
+            if stage == "debug" else
+            f"Stage '{stage}' using {decision.topology.value} based on task features"
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: zen_check_degradation - Check if should fall back to simpler topology
+# ============================================================================
+
+@mcp.tool()
+def zen_check_degradation(
+    current_topology: Literal["sas", "mas_independent", "mas_centralized"],
+    total_messages: int = 0,
+    total_rounds: int = 0,
+    successes: int = 0,
+    failures: int = 0,
+    redundancy_rate: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    Check if coordination should degrade to a simpler topology.
+
+    Paper Rule C: "Coordination overhead is a first-class cost function"
+    When MAS isn't improving results, automatically fall back to SAS.
+
+    Degradation triggers:
+    - High coordination overhead without success improvement
+    - Error amplification > 1.0 (MAS making more errors than SAS would)
+    - High redundancy (agents producing identical outputs)
+    - Consecutive format errors
+
+    Args:
+        current_topology: Current coordination topology.
+        total_messages: Total messages sent in coordination.
+        total_rounds: Total coordination rounds.
+        successes: Number of successful outcomes.
+        failures: Number of failed outcomes.
+        redundancy_rate: 0-1, similarity of agent outputs.
+
+    Returns:
+        Degradation decision with new topology if needed.
+    """
+    # Build metrics
+    metrics = CoordinationMetrics(
+        total_messages=total_messages,
+        total_rounds=total_rounds,
+        successes=successes,
+        failures=failures,
+        redundancy_rate=redundancy_rate,
+    )
+
+    # Compute derived metrics
+    total = successes + failures
+    if total > 0:
+        sas_failure_rate = 0.3  # Baseline assumption
+        metrics.error_amplification = estimate_error_amplification(
+            failures, total, sas_failure_rate
+        )
+
+    # Get decision for threshold
+    topology_map = {
+        "sas": CoordinationTopology.SAS,
+        "mas_independent": CoordinationTopology.MAS_INDEPENDENT,
+        "mas_centralized": CoordinationTopology.MAS_CENTRALIZED,
+    }
+    current = topology_map.get(current_topology, CoordinationTopology.SAS)
+
+    decision = CoordinationDecision(
+        topology=current,
+        confidence=0.5,
+        rationale="Current topology",
+        overhead_threshold=2.0,
+    )
+
+    should_degrade, new_topology, reason = architecture_engine.should_degrade(
+        current, metrics, decision
+    )
+
+    # Also check format error counter
+    format_degrade, format_reason = degradation_strategy.should_degrade()
+    if format_degrade:
+        should_degrade = True
+        reason = format_reason
+
+    return {
+        "ok": True,
+        "should_degrade": should_degrade,
+        "current_topology": current_topology,
+        "recommended_topology": new_topology.value if new_topology else current_topology,
+        "reason": reason,
+        "metrics": {
+            "error_amplification": metrics.error_amplification,
+            "redundancy_rate": redundancy_rate,
+            "success_rate": successes / total if total > 0 else 0,
+            "coordination_overhead": total_messages / max(total, 1),
+        },
+        "action": (
+            f"DEGRADE to {new_topology.value}: {reason}" if should_degrade
+            else "CONTINUE with current topology"
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: zen_record_coordination_result - Record result for calibration
+# ============================================================================
+
+@mcp.tool()
+def zen_record_coordination_result(
+    topology: Literal["sas", "mas_independent", "mas_centralized"],
+    success: bool,
+    tokens_used: int = 0,
+    messages_sent: int = 0,
+    rounds: int = 1,
+    outputs: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Record coordination result for calibration (Rule D).
+
+    Paper Rule D: "Model family calibration is necessary"
+    By recording results, the system learns which topology works best
+    for your specific codebase and task types.
+
+    Call this after each coordination attempt to build calibration data.
+
+    Args:
+        topology: Which topology was used.
+        success: Whether the coordination succeeded.
+        tokens_used: Tokens consumed.
+        messages_sent: Messages sent between agents.
+        rounds: Coordination rounds.
+        outputs: Optional list of agent outputs (for redundancy calculation).
+
+    Returns:
+        Updated statistics for the topology.
+    """
+    topology_map = {
+        "sas": CoordinationTopology.SAS,
+        "mas_independent": CoordinationTopology.MAS_INDEPENDENT,
+        "mas_centralized": CoordinationTopology.MAS_CENTRALIZED,
+    }
+    topo = topology_map.get(topology, CoordinationTopology.SAS)
+
+    # Start tracking
+    metrics_tracker.start_run()
+
+    # Record metrics
+    for _ in range(messages_sent):
+        metrics_tracker.record_message(tokens_used // max(messages_sent, 1))
+
+    for i in range(rounds):
+        metrics_tracker.record_round(is_synthesis=(i == rounds - 1))
+
+    if success:
+        metrics_tracker.record_success()
+    else:
+        metrics_tracker.record_failure()
+        degradation_strategy.record_format_error()  # Track for degradation
+
+    # Record redundancy if outputs provided
+    if outputs and len(outputs) > 1:
+        redundancy = compute_redundancy(outputs)
+        metrics_tracker.record_redundancy([redundancy])
+
+    # End tracking
+    final_metrics = metrics_tracker.end_run(topo)
+
+    # Get updated stats
+    stats = metrics_tracker.get_topology_stats(topo)
+
+    return {
+        "ok": True,
+        "recorded": {
+            "topology": topology,
+            "success": success,
+            "tokens_used": tokens_used,
+            "messages_sent": messages_sent,
+            "rounds": rounds,
+        },
+        "run_metrics": {
+            "coordination_overhead": final_metrics.coordination_overhead,
+            "message_density": final_metrics.message_density,
+            "redundancy_rate": final_metrics.redundancy_rate,
+        },
+        "topology_stats": {
+            "total_runs": stats["count"],
+            "success_rate": stats["success_rate"],
+            "avg_overhead": stats["avg_overhead"],
+            "avg_tokens": stats["avg_tokens"],
+        },
+        "calibration_hint": (
+            f"After {stats['count']} runs, {topology} has {stats['success_rate']*100:.1f}% success rate"
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: zen_get_coordination_stats - Get calibration statistics
+# ============================================================================
+
+@mcp.tool()
+def zen_get_coordination_stats() -> Dict[str, Any]:
+    """
+    Get coordination calibration statistics.
+
+    Paper Rule D: Use calibration data to inform architecture selection.
+
+    Returns statistics for each topology:
+    - Success rate
+    - Average overhead
+    - Average token usage
+    - Number of samples
+
+    Use this to understand which topologies work best for your tasks.
+
+    Returns:
+        Statistics per topology and recommendations.
+    """
+    stats = {}
+    for topo in [CoordinationTopology.SAS, CoordinationTopology.MAS_INDEPENDENT, CoordinationTopology.MAS_CENTRALIZED]:
+        topo_stats = metrics_tracker.get_topology_stats(topo)
+        stats[topo.value] = {
+            "success_rate": topo_stats["success_rate"],
+            "avg_overhead": topo_stats["avg_overhead"],
+            "avg_tokens": topo_stats["avg_tokens"],
+            "sample_count": topo_stats["count"],
+        }
+
+    # Find best topology
+    best_topo = None
+    best_score = -1
+    for topo_name, topo_stats in stats.items():
+        if topo_stats["sample_count"] >= 3:
+            score = topo_stats["success_rate"] - (topo_stats["avg_overhead"] * 0.1)
+            if score > best_score:
+                best_score = score
+                best_topo = topo_name
+
+    return {
+        "ok": True,
+        "topology_stats": stats,
+        "best_topology": best_topo,
+        "best_topology_score": best_score if best_topo else None,
+        "total_samples": sum(s["sample_count"] for s in stats.values()),
+        "recommendation": (
+            f"Based on {sum(s['sample_count'] for s in stats.values())} samples, "
+            f"'{best_topo}' performs best with {stats[best_topo]['success_rate']*100:.1f}% success rate"
+            if best_topo else "Not enough data for recommendation (need 3+ samples per topology)"
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: zen_get_stage_strategy - Get recommended strategy for a stage
+# ============================================================================
+
+@mcp.tool()
+def zen_get_stage_strategy(
+    stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
+) -> Dict[str, Any]:
+    """
+    Get the recommended coordination strategy for a workflow stage.
+
+    Returns stage-specific guidance based on paper insights:
+    - analyze: Parallel info gathering, score-based selection
+    - hypothesize: Parallel hypothesis gen, falsifiability scoring
+    - implement: Parallel patch gen, TEST-FIRST selection
+    - debug: SEQUENTIAL (SAS), minimize coordination
+    - improve: Parallel review, skill extraction
+
+    Args:
+        stage: The workflow stage.
+
+    Returns:
+        Detailed strategy with topology, voting mode, and red-flag rules.
+    """
+    features = TaskStructureFeatures()  # Default features
+    strategy = architecture_engine.get_stage_recommendation(stage, features)
+
+    # Add paper insights
+    paper_insights = {
+        "analyze": (
+            "Stage 1 uses parallel independent generation. "
+            "Multiple models extract observations, orchestrator synthesizes. "
+            "Voting is score-based (not test-based)."
+        ),
+        "hypothesize": (
+            "Stage 2 uses parallel hypothesis generation. "
+            "Selection criteria: falsifiability > low experiment cost > explanation coverage. "
+            "Paper: 'MAS excels at decomposable information generation tasks.'"
+        ),
+        "implement": (
+            "Stage 3 generates patches in parallel, then TEST-FIRST selection. "
+            "Voting is secondary to test results. "
+            "Paper: 'Tests are stronger judges than consensus for code.'"
+        ),
+        "debug": (
+            "Stage 4 MUST use SAS (single-agent). "
+            "Paper: 'Sequential tasks with state accumulation degrade significantly with MAS.' "
+            "Max 5 iterations before human escalation."
+        ),
+        "improve": (
+            "Stage 5 extracts reusable patterns from successful fixes. "
+            "Parallel review is OK for suggestions. "
+            "Output: skill templates, policy updates, playbook improvements."
+        ),
+    }
+
+    return {
+        "ok": True,
+        "stage": stage,
+        "strategy": strategy,
+        "paper_insight": paper_insights.get(stage, ""),
+        "key_rules": {
+            "topology": strategy.get("topology", "sas"),
+            "ensemble_strategy": strategy.get("ensemble_strategy", "single_agent"),
+            "voting_mode": strategy.get("voting_mode", "test_first"),
+            "red_flags": strategy.get("red_flag_rules", []),
+        },
+        "warning": (
+            "DEBUG STAGE: Do NOT use multi-agent coordination here. "
+            "Paper shows 39-70% degradation with MAS in sequential tasks."
+            if stage == "debug" else None
+        ),
     }
 
 

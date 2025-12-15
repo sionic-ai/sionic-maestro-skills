@@ -90,7 +90,7 @@ claude
 # Should show zen-skills-mcp as running
 ```
 
-## Available Tools (28 Total)
+## Available Tools (34 Total)
 
 ### Core Consultation Tools
 
@@ -152,7 +152,7 @@ claude
 | `zen_get_loaded_tools` | Show loaded tools | Check available tools |
 | `zen_recommend_tools` | Recommend tools for task | Before starting any work |
 
-### MAKER-style Micro-step Tools (NEW - Error Correction)
+### MAKER-style Micro-step Tools (Error Correction)
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
@@ -160,6 +160,17 @@ claude
 | `zen_vote_micro_step` | Vote on micro-step result | Error-corrected execution |
 | `zen_calibrate` | Calibrate voting k parameter | Before long workflows |
 | `zen_red_flag_check` | Check for format errors | Before accepting any output |
+
+### Coordination Tools (NEW - Architecture Selection)
+
+| Tool | Purpose | Use When |
+|------|---------|----------|
+| `zen_classify_task` | Analyze task structure | Start of Stage 1 (Analyze) |
+| `zen_select_architecture` | Choose SAS vs MAS topology | Before each stage |
+| `zen_check_degradation` | Check if should fall back | During coordination |
+| `zen_record_coordination_result` | Record for calibration | After each coordination |
+| `zen_get_coordination_stats` | Get calibration data | Monitor effectiveness |
+| `zen_get_stage_strategy` | Get stage-specific strategy | Before executing stage |
 
 ## The 5-Stage Workflow
 
@@ -249,6 +260,58 @@ Micro-step types by stage:
 - **Implement**: `c1_minimal_patch`, `c2_compile_check`
 - **Debug**: `d1_failure_label`, `d2_next_experiment`
 - **Improve**: `r1_refactor`, `r2_perf`
+
+### Architecture Selection Engine (Coordination Rules A-D)
+
+Automatically select optimal coordination topology based on task structure:
+
+```python
+# 1. Classify task structure at start
+result = zen_classify_task(
+    task_description="Fix the authentication bug in login flow",
+    error_logs="NullPointerException at AuthService.java:42..."
+)
+# Returns: {
+#   "features": {"decomposability_score": 0.3, "sequential_dependency_score": 0.7},
+#   "recommended_topology": "sas",
+#   "paper_rule_applied": "Rule B: Sequential → SAS"
+# }
+
+# 2. Select architecture for each stage
+result = zen_select_architecture(
+    stage="hypothesize",
+    decomposability_score=0.8,
+    sequential_dependency_score=0.2
+)
+# Returns: {"topology": "mas_independent", "max_agents": 3}
+
+# 3. Check for degradation during execution
+result = zen_check_degradation(
+    current_topology="mas_independent",
+    successes=2, failures=5,
+    redundancy_rate=0.9
+)
+# Returns: {"should_degrade": True, "reason": "High redundancy (0.9)..."}
+
+# 4. Record results for calibration (Rule D)
+zen_record_coordination_result(
+    topology="mas_independent",
+    success=True,
+    tokens_used=5000
+)
+```
+
+**Paper Rules Implemented:**
+- **Rule A**: Architecture depends on domain/task structure
+- **Rule B**: Decomposable → MAS, Sequential → SAS
+- **Rule C**: Coordination overhead is a first-class cost
+- **Rule D**: Model family calibration is necessary
+
+**Stage-specific Defaults:**
+- **analyze/hypothesize**: `mas_independent` (parallel info gathering)
+- **implement**: `mas_centralized` (tool-heavy, needs supervision)
+- **debug**: `sas` (sequential dependency, MAS degrades 39-70%)
+- **improve**: `mas_independent` (parallel review OK)
 
 ### Voting Calibration
 
@@ -472,7 +535,7 @@ The server tracks metrics from both papers:
 
 ```
 zen-skills-mcp/
-├── server.py              # MCP server entry point (28 tools)
+├── server.py              # MCP server entry point (34 tools)
 ├── requirements.txt       # Dependencies
 ├── .env.example          # Configuration template
 ├── conf/
@@ -509,8 +572,9 @@ zen-skills-mcp/
     ├── verify.py          # Test/lint execution
     ├── workspace.py       # Safe file operations
     ├── tracing.py         # Metrics, evidence chain
-    ├── maker.py           # MAKER core: vote_step, redflagger, calibrate (NEW)
-    └── skills.py          # Dynamic skill loading + tool registry (NEW)
+    ├── maker.py           # MAKER core: vote_step, redflagger, calibrate
+    ├── skills.py          # Dynamic skill loading + tool registry
+    └── coordination.py    # Architecture Selection Engine (Rules A-D) (NEW)
 ```
 
 ## Contributing
