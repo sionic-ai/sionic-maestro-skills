@@ -20,7 +20,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from concurrent.futures import ThreadPoolExecutor
-import re
 
 logger = logging.getLogger("zen.providers")
 

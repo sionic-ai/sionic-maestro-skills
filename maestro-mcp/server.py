@@ -442,7 +442,7 @@ def zen_select_best(
     test_results: Optional[List[Dict[str, Any]]] = None,
     lint_results: Optional[List[Dict[str, Any]]] = None,
     judge_provider: Literal["claude", "codex", "gemini"] = "claude",
-    criteria: List[str] = ["correctness", "safety", "completeness"],
+    criteria: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Select the best candidate from ensemble output.
@@ -467,6 +467,9 @@ def zen_select_best(
     Returns:
         Dictionary with winner_id, winner, rationale, scores.
     """
+    # Initialize mutable defaults
+    criteria = criteria or ["correctness", "safety", "completeness"]
+
     if not candidates:
         return {"ok": False, "error": "No candidates provided"}
 
@@ -1286,7 +1289,7 @@ def zen_consensus_vote(
     question: str,
     k: int = 3,
     max_rounds: int = 12,
-    providers: List[str] = ["codex", "gemini", "claude"],
+    providers: Optional[List[str]] = None,
     require_json: bool = False,
     max_response_chars: int = 2000,
 ) -> Dict[str, Any]:
@@ -1318,6 +1321,9 @@ def zen_consensus_vote(
     Returns:
         ConsensusResult with winner, confidence, and vote trace.
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini", "claude"]
+
     # Provider callback
     def provider_callback(provider: str, prompt: str):
         return registry.run(provider, prompt)
@@ -1769,7 +1775,7 @@ def zen_vote_micro_step(
     context: str = "",
     k: Optional[int] = None,
     max_rounds: int = 15,
-    providers: List[str] = ["codex", "gemini"],
+    providers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Run MAKER-style first-to-ahead-by-k voting on a micro-step.
@@ -1792,6 +1798,9 @@ def zen_vote_micro_step(
     Returns:
         VoteResult with winner content, confidence, and voting trace.
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini"]
+
     # Get step specification
     step_enum = MicroStepType(step_type)
     spec = MICRO_STEP_SPECS.get(step_enum)
@@ -1884,7 +1893,7 @@ def zen_calibrate(
     target_success_rate: float = 0.99,
     estimated_total_steps: int = 100,
     num_samples: int = 10,
-    providers: List[str] = ["codex", "gemini"],
+    providers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Calibrate voting parameters (k) for a step type.
@@ -1908,6 +1917,9 @@ def zen_calibrate(
     Returns:
         CalibrationResult with recommended k and accuracy estimates.
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini"]
+
     step_enum = MicroStepType(step_type)
     spec = MICRO_STEP_SPECS.get(step_enum)
 
@@ -2596,7 +2608,7 @@ def zen_get_stage_strategy(
 # ============================================================================
 
 if __name__ == "__main__":
-    logger.info("Starting Zen Skills MCP Server...")
+    logger.info("Starting Maestro MCP Server...")
     logger.info(f"Available providers: {registry.list_providers()}")
     logger.info(f"Trace directory: {config.tracing.trace_dir}")
     logger.info(f"Max tools per stage: {tool_registry.max_tools}")

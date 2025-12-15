@@ -166,6 +166,18 @@ BLOCKED_PYTHON_MODULES = [
 ]
 
 
+# Shared executor for async verification operations
+_SHARED_EXECUTOR: Optional[ThreadPoolExecutor] = None
+
+
+def _get_shared_executor() -> ThreadPoolExecutor:
+    """Get or create the shared thread pool executor for verification."""
+    global _SHARED_EXECUTOR
+    if _SHARED_EXECUTOR is None:
+        _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+    return _SHARED_EXECUTOR
+
+
 class VerificationEngine:
     """
     Executes verification commands safely and returns structured results.
@@ -186,7 +198,7 @@ class VerificationEngine:
         self.timeout_sec = timeout_sec
         self.max_output_chars = max_output_chars
         self.allowed_commands = allowed_commands or ALLOWED_COMMAND_PREFIXES
-        self._executor = ThreadPoolExecutor(max_workers=4)
+        # Note: Uses module-level shared executor (_get_shared_executor) for async ops
 
     def _validate_command(self, command: str) -> Tuple[bool, str]:
         """Validate that a command is safe to execute."""
@@ -417,7 +429,7 @@ class VerificationEngine:
             cmd_cwd = cmd_spec.get("cwd", cwd)
 
             return await loop.run_in_executor(
-                self._executor,
+                _get_shared_executor(),
                 lambda: self.run(command, v_type, cmd_cwd, timeout_sec=timeout),
             )
 
