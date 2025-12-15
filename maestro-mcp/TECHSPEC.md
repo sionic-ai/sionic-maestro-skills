@@ -41,17 +41,29 @@ Add regex-based masking before any external CLI call.
 
 #### 1. Add to `zen/config.py`
 
+Following the existing pattern of nested dataclasses (`ProviderConfig`, `CoordinationPolicy`, etc.):
+
 ```python
 import re
 from typing import List, Pattern
 
 @dataclass
-class ZenConfig:
-    # ... existing fields ...
-
-    # Secret masking
+class MaskingConfig:
+    """Configuration for secret masking in prompts."""
     mask_regexes: List[Pattern] = field(default_factory=list)
     mask_replacement: str = "***MASKED***"
+
+
+@dataclass
+class ZenConfig:
+    # ... existing nested configs ...
+    providers: Dict[str, ProviderConfig] = field(default_factory=dict)
+    policy: CoordinationPolicy = field(default_factory=CoordinationPolicy)
+    context: ContextConfig = field(default_factory=ContextConfig)
+    tracing: TracingConfig = field(default_factory=TracingConfig)
+
+    # NEW: Secret masking (follows same nested pattern)
+    masking: MaskingConfig = field(default_factory=MaskingConfig)
 
     @classmethod
     def from_env(cls) -> "ZenConfig":
@@ -69,25 +81,29 @@ class ZenConfig:
                     except re.error:
                         logging.warning(f"Invalid mask regex: {pattern}")
 
-        # Add default patterns
+        # Add default patterns (no inline (?i) - using IGNORECASE flag instead)
         default_patterns = [
-            r"(?i)(api[_-]?key|apikey)\s*[:=]\s*['\"]?[\w-]+['\"]?",
-            r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"]?[^\s'\"]+['\"]?",
-            r"(?i)(secret|token)\s*[:=]\s*['\"]?[\w-]+['\"]?",
-            r"(?i)(bearer)\s+[\w-]+",
-            r"(?i)(authorization)\s*[:=]\s*['\"]?[^\s'\"]+['\"]?",
+            r"(api[_-]?key|apikey)\s*[:=]\s*['\"]?[\w-]+['\"]?",
+            r"(password|passwd|pwd)\s*[:=]\s*['\"]?[^\s'\"]+['\"]?",
+            r"(secret|token)\s*[:=]\s*['\"]?[\w-]+['\"]?",
+            r"(bearer)\s+[\w-]+",
+            r"(authorization)\s*[:=]\s*['\"]?[^\s'\"]+['\"]?",
             r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API keys
             r"ghp_[a-zA-Z0-9]{36}",  # GitHub tokens
             r"gho_[a-zA-Z0-9]{36}",  # GitHub OAuth tokens
             r"glpat-[a-zA-Z0-9-]{20}",  # GitLab tokens
         ]
         for pattern in default_patterns:
-            mask_regexes.append(re.compile(pattern))
+            mask_regexes.append(re.compile(pattern, re.IGNORECASE))
+
+        masking = MaskingConfig(
+            mask_regexes=mask_regexes,
+            mask_replacement=os.getenv("ZEN_MASK_REPLACEMENT", "***MASKED***"),
+        )
 
         return cls(
             # ... existing fields ...
-            mask_regexes=mask_regexes,
-            mask_replacement=os.getenv("ZEN_MASK_REPLACEMENT", "***MASKED***"),
+            masking=masking,
         )
 ```
 
@@ -97,8 +113,8 @@ class ZenConfig:
 def mask_secrets(text: str, config: ZenConfig) -> str:
     """Mask sensitive data in text before sending to external CLIs."""
     result = text
-    for pattern in config.mask_regexes:
-        result = pattern.sub(config.mask_replacement, result)
+    for pattern in config.masking.mask_regexes:  # Use nested config
+        result = pattern.sub(config.masking.mask_replacement, result)
     return result
 ```
 
@@ -162,7 +178,7 @@ Add `jsonschema` dependency and use it for all schema validation.
 #### 1. Update `requirements.txt`
 
 ```
-jsonschema>=4.0.0
+jsonschema>=4.17.0  # Required for Draft202012Validator
 ```
 
 #### 2. Add validation utility to `zen/selection.py`
@@ -197,12 +213,26 @@ class RedFlagger:
     def _check_required_fields(self, content: str, schema: Dict) -> List[str]:
         """Check if JSON content validates against schema."""
         try:
-            # Extract JSON from content
-            json_match = re.search(r'\{[\s\S]*\}', content)
+            # Extract JSON from content (non-greedy to avoid over-matching)
+            # Note: r'\{[\s\S]*\}' is too greedy - matches first { to LAST }
+            # Using non-greedy or iterative approach instead
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content)
             if not json_match:
-                return ["No JSON object found"]
-
-            data = json.loads(json_match.group())
+                # Fallback: try to find valid JSON by parsing incrementally
+                start = content.find('{')
+                if start == -1:
+                    return ["No JSON object found"]
+                for end in range(len(content) - 1, start, -1):
+                    if content[end] == '}':
+                        try:
+                            data = json.loads(content[start:end+1])
+                            break
+                        except json.JSONDecodeError:
+                            continue
+                else:
+                    return ["No valid JSON object found"]
+            else:
+                data = json.loads(json_match.group())
 
             # Use jsonschema for validation
             validator = Draft202012Validator(schema)
@@ -298,21 +328,26 @@ Create comprehensive pytest test suite.
 maestro-mcp/
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py              # Fixtures
+│   ├── conftest.py              # Shared fixtures
 │   ├── test_config.py           # ZenConfig tests
 │   ├── test_providers.py        # Provider tests (mocked CLIs)
 │   ├── test_selection.py        # Selection engine tests
-│   ├── test_maker.py            # MAKER module tests
-│   │   ├── test_red_flagger.py
-│   │   ├── test_vote_step.py
-│   │   └── test_calibrator.py
 │   ├── test_coordination.py     # Architecture selection tests
 │   ├── test_skills.py           # Dynamic tool loading tests
 │   ├── test_workspace.py        # Patch application tests
-│   └── test_integration.py      # End-to-end tests
+│   ├── test_integration.py      # End-to-end tests
+│   └── maker/                   # MAKER module tests (subpackage)
+│       ├── __init__.py
+│       ├── test_red_flagger.py
+│       ├── test_vote_step.py
+│       └── test_calibrator.py
 ├── pytest.ini
 └── requirements-dev.txt
 ```
+
+> **Note**: Python doesn't allow `.py` files to contain other files. Use either:
+> - Flat structure: All `test_*.py` in `tests/`
+> - Package structure: `tests/maker/` directory with `__init__.py`
 
 ### Implementation
 
@@ -653,10 +688,17 @@ def git_state(cwd: Optional[Path] = None) -> Dict[str, Any]:
 
     state = {"root": root}
 
-    # Branch
+    # Branch (handle detached HEAD state)
     branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
     if branch:
         state["branch"] = branch
+        # Detect detached HEAD state
+        if branch == "HEAD":
+            state["is_detached_head"] = True
+            # Try to get more context about detached state
+            describe = run_git(["describe", "--tags", "--always"])
+            if describe:
+                state["detached_at"] = describe
 
     # Commit
     commit = run_git(["rev-parse", "HEAD"])
@@ -780,6 +822,31 @@ class ArtifactMetadata:
     git_branch: Optional[str] = None
 
 
+@dataclass
+class RunContext:
+    """Thread-safe context for a single run (avoids race conditions)."""
+    run_id: str
+    run_dir: Path
+
+    def save_stage_result(self, stage: str, result: Dict[str, Any]):
+        """Save stage output."""
+        self._write_json(f"stage_{stage}.json", result)
+
+    def save_policy_decision(self, decision: Dict[str, Any]):
+        """Append policy decision to JSONL."""
+        self._append_jsonl("policy_decisions.jsonl", decision)
+
+    def _write_json(self, filename: str, data: Dict):
+        path = self.run_dir / filename
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2, default=str)
+
+    def _append_jsonl(self, filename: str, data: Dict):
+        path = self.run_dir / filename
+        with open(path, "a") as f:
+            f.write(json.dumps(data, default=str) + "\n")
+
+
 class ArtifactStore:
     """
     Persists run artifacts for audit and replay.
@@ -796,78 +863,44 @@ class ArtifactStore:
     │   ├── policy_decisions.jsonl
     │   ├── coordination_metrics.json
     │   └── final_recommendation.json
+
+    Note: Returns RunContext objects to avoid race conditions with concurrent runs.
+    Each RunContext is independent and thread-safe.
     """
 
     def __init__(self, base_dir: Path, enabled: bool = True):
         self.base_dir = base_dir
         self.enabled = enabled
-        self.current_run_id: Optional[str] = None
-        self._run_dir: Optional[Path] = None
+        # Note: Removed instance-level current_run_id/_run_dir to prevent race conditions
+        # Instead, start_run() returns a RunContext that callers should use
 
-    def start_run(self, task: str, git_state: Optional[Dict] = None) -> str:
-        """Start a new run and return run_id."""
+    def start_run(self, task: str, git_state: Optional[Dict] = None) -> RunContext:
+        """
+        Start a new run and return a RunContext for thread-safe artifact writing.
+
+        Returns:
+            RunContext object that should be used for all artifact operations.
+            This avoids race conditions when multiple runs happen concurrently.
+        """
         if not self.enabled:
-            return ""
+            return None
 
-        self.current_run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-        self._run_dir = self.base_dir / self.current_run_id
-        self._run_dir.mkdir(parents=True, exist_ok=True)
+        run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        run_dir = self.base_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
 
         # Write metadata
         metadata = ArtifactMetadata(
-            run_id=self.current_run_id,
+            run_id=run_id,
             created_at=datetime.now().isoformat(),
             task=task,
             git_commit=git_state.get("short_commit") if git_state else None,
             git_branch=git_state.get("branch") if git_state else None,
         )
-        self._write_json("metadata.json", asdict(metadata))
+        with open(run_dir / "metadata.json", "w") as f:
+            json.dump(asdict(metadata), f, indent=2, default=str)
 
-        return self.current_run_id
-
-    def save_stage_result(self, stage: str, result: Dict[str, Any]):
-        """Save stage output."""
-        if not self.enabled or not self._run_dir:
-            return
-        self._write_json(f"stage_{stage}.json", result)
-
-    def save_policy_decision(self, decision: Dict[str, Any]):
-        """Append policy decision to JSONL."""
-        if not self.enabled or not self._run_dir:
-            return
-        self._append_jsonl("policy_decisions.jsonl", decision)
-
-    def save_coordination_metrics(self, metrics: Dict[str, Any]):
-        """Save coordination metrics."""
-        if not self.enabled or not self._run_dir:
-            return
-        self._write_json("coordination_metrics.json", metrics)
-
-    def save_recommendation(self, recommendation: Dict[str, Any]):
-        """Save final recommendation."""
-        if not self.enabled or not self._run_dir:
-            return
-        self._write_json("final_recommendation.json", recommendation)
-
-    def end_run(self) -> Optional[Path]:
-        """End current run and return artifact directory."""
-        if not self.enabled or not self._run_dir:
-            return None
-
-        run_dir = self._run_dir
-        self.current_run_id = None
-        self._run_dir = None
-        return run_dir
-
-    def _write_json(self, filename: str, data: Dict):
-        path = self._run_dir / filename
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-
-    def _append_jsonl(self, filename: str, data: Dict):
-        path = self._run_dir / filename
-        with open(path, "a") as f:
-            f.write(json.dumps(data, default=str) + "\n")
+        return RunContext(run_id=run_id, run_dir=run_dir)
 
     def list_runs(self, limit: int = 10) -> list[Dict[str, Any]]:
         """List recent runs."""
@@ -905,12 +938,39 @@ class ArtifactStore:
 #### 3. Add MCP tools
 
 ```python
+# Global store for active run contexts (keyed by run_id)
+_active_runs: Dict[str, RunContext] = {}
+
 @mcp.tool()
 def zen_start_artifact_run(task: str) -> Dict[str, str]:
-    """Start a new artifact run for the given task."""
+    """Start a new artifact run for the given task.
+
+    Returns a run_id that should be passed to subsequent artifact operations.
+    This design avoids race conditions when multiple runs happen concurrently.
+    """
     from zen.workspace import git_state
-    run_id = artifact_store.start_run(task, git_state())
-    return {"run_id": run_id, "enabled": artifact_store.enabled}
+    ctx = artifact_store.start_run(task, git_state())
+    if ctx:
+        _active_runs[ctx.run_id] = ctx
+        return {"run_id": ctx.run_id, "enabled": True}
+    return {"run_id": "", "enabled": False}
+
+@mcp.tool()
+def zen_save_stage_artifact(run_id: str, stage: str, result: Dict) -> Dict[str, bool]:
+    """Save stage result to an active artifact run."""
+    ctx = _active_runs.get(run_id)
+    if ctx:
+        ctx.save_stage_result(stage, result)
+        return {"success": True}
+    return {"success": False, "error": f"No active run: {run_id}"}
+
+@mcp.tool()
+def zen_end_artifact_run(run_id: str) -> Dict[str, str]:
+    """End an artifact run and return the artifact directory."""
+    ctx = _active_runs.pop(run_id, None)
+    if ctx:
+        return {"run_id": run_id, "path": str(ctx.run_dir)}
+    return {"run_id": run_id, "error": "Run not found"}
 
 @mcp.tool()
 def zen_list_artifact_runs(limit: int = 10) -> List[Dict]:
@@ -1051,23 +1111,74 @@ These modules are well-structured and implement specific paper concepts.
 3. Add deprecation warnings to old modules
 4. Remove old modules after verification
 
+### Deprecation Phase (Required)
+
+To avoid breaking external imports, add re-exports with warnings:
+
+```python
+# zen/providers.py (DEPRECATED - keep for backwards compatibility)
+import warnings
+from .core import call_provider, ProviderResponse, ZenConfig
+
+# Re-export for backwards compatibility
+__all__ = ["CodexProvider", "GeminiProvider", "ClaudeProvider", "ProviderRegistry"]
+
+class CodexProvider:
+    """DEPRECATED: Use zen.core.call_provider() instead."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "CodexProvider is deprecated. Use zen.core.call_provider('codex', ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._args = args
+        self._kwargs = kwargs
+
+    def run(self, prompt: str, model: Optional[str] = None, **kwargs) -> ProviderResponse:
+        return call_provider("codex", prompt, model=model, **kwargs)
+
+
+class GeminiProvider:
+    """DEPRECATED: Use zen.core.call_provider() instead."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "GeminiProvider is deprecated. Use zen.core.call_provider('gemini', ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    def run(self, prompt: str, model: Optional[str] = None, **kwargs) -> ProviderResponse:
+        return call_provider("gemini", prompt, model=model, **kwargs)
+
+
+# Similar for ClaudeProvider and ProviderRegistry...
+```
+
+This allows existing code like `from zen.providers import CodexProvider` to continue
+working while emitting deprecation warnings, giving users time to migrate.
+
 ### Risk Mitigation
 
 - All tests must pass after each consolidation step
 - Keep git history clean with atomic commits
 - Document breaking changes in CHANGELOG.md
+- Keep deprecated modules for at least 2 minor versions before removal
 
 ---
 
-## Implementation Timeline
+## Implementation Order
 
-| Week | Tasks |
-|------|-------|
-| 1 | P0-1 (Secret Masking), P0-2 (JSON Schema) |
-| 2 | P0-3 (Test Suite - core tests) |
-| 3 | P0-3 (Test Suite - remaining), P1-1 (Git State) |
-| 4 | P1-2 (Artifact System) |
-| 5-6 | P2-1 (Module Consolidation) |
+Tasks should be completed in this order (no time estimates - let users schedule):
+
+| Phase | Tasks | Dependencies |
+|-------|-------|--------------|
+| 1 | P0-1 (Secret Masking), P0-2 (JSON Schema) | None |
+| 2 | P0-3 (Test Suite - core tests) | Phase 1 |
+| 3 | P0-3 (Test Suite - remaining), P1-1 (Git State) | Phase 2 |
+| 4 | P1-2 (Artifact System) | Phase 1 |
+| 5 | P2-1 (Module Consolidation) | All P0 and P1 complete |
 
 ---
 
@@ -1092,9 +1203,48 @@ These modules are well-structured and implement specific paper concepts.
 
 ---
 
+## Appendix: Existing Code Fixes
+
+### Fix Deprecated `asyncio.get_event_loop()` in `zen/providers.py`
+
+Current code at line 193-198 uses deprecated `asyncio.get_event_loop()`:
+
+```python
+# CURRENT (deprecated in Python 3.10+, removed in 3.12)
+async def run_async(self, prompt, ...):
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, ...)
+```
+
+**Fix** - Use `asyncio.to_thread()` (Python 3.9+):
+
+```python
+# FIXED
+async def run_async(
+    self,
+    prompt: str,
+    model: Optional[str] = None,
+    timeout_sec: Optional[int] = None,
+    output_schema: Optional[Dict[str, Any]] = None,
+    cwd: Optional[str] = None,
+) -> ProviderResponse:
+    """Execute the CLI command asynchronously."""
+    # asyncio.to_thread() is the modern replacement for run_in_executor
+    # Available since Python 3.9, handles thread pool internally
+    return await asyncio.to_thread(
+        self.run, prompt, model, timeout_sec, output_schema, cwd
+    )
+```
+
+This should be fixed as part of P2-1 (Module Consolidation) when merging into `core.py`.
+
+---
+
 ## References
 
 - `CRITICAL_ANALYSIS.md` - Comparison with sionic-mcp
 - sionic-mcp `app.py` - Reference implementation
 - [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/json-schema-core.html)
 - [pytest documentation](https://docs.pytest.org/)
+- [asyncio.to_thread() documentation](https://docs.python.org/3/library/asyncio-task.html#asyncio.to_thread)
