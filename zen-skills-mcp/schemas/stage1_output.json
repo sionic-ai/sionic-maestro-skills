@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 1: Example Analysis Output",
+  "description": "Structured output from the Example Analysis stage",
+  "type": "object",
+  "required": ["observations", "constraints", "unknowns", "repro_steps", "confidence"],
+  "properties": {
+    "observations": {
+      "type": "array",
+      "description": "Factual observations without interpretation",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["fact", "source"],
+        "properties": {
+          "fact": {
+            "type": "string",
+            "description": "The observed fact (what IS, not what it means)"
+          },
+          "source": {
+            "type": "string",
+            "description": "Where this was observed (file:line or log entry)"
+          },
+          "line_number": {
+            "type": "integer",
+            "description": "Specific line number if applicable"
+          },
+          "certainty": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "default": "high",
+            "description": "How certain we are about this observation"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Things that must NOT change",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "description": "Missing information or assumptions being made",
+      "items": {
+        "type": "string"
+      }
+    },
+    "repro_steps": {
+      "type": "array",
+      "description": "Minimal steps to reproduce the issue",
+      "items": {
+        "type": "string"
+      }
+    },
+    "affected_modules": {
+      "type": "array",
+      "description": "Files/modules involved in the issue",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence that we have sufficient information to proceed (0-1)"
+    }
+  },
+  "examples": [
+    {
+      "observations": [
+        {
+          "fact": "IndexError: list index out of range",
+          "source": "src/auth.py:42",
+          "line_number": 42,
+          "certainty": "high"
+        },
+        {
+          "fact": "users list is empty when accessed",
+          "source": "test output",
+          "certainty": "high"
+        }
+      ],
+      "constraints": [
+        "Must not change the User model interface",
+        "Must preserve backward compatibility with v2 API"
+      ],
+      "unknowns": [
+        "Is the empty list intentional for this test case?",
+        "When did this test last pass?"
+      ],
+      "repro_steps": [
+        "cd project_root",
+        "pytest tests/test_auth.py::test_login -v"
+      ],
+      "affected_modules": [
+        "src/auth.py",
+        "tests/test_auth.py"
+      ],
+      "confidence": 0.75
+    }
+  ]
+}

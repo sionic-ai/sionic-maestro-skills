@@ -1,0 +1,563 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Zen Skills MCP Tool Schemas",
+  "description": "JSON Schema definitions for all MCP tools",
+
+  "definitions": {
+    "cli_call": {
+      "title": "cli.call",
+      "description": "Bridge requests to external CLI tools (claude, codex, gemini)",
+      "input": {
+        "type": "object",
+        "required": ["cli", "prompt"],
+        "properties": {
+          "cli": {
+            "type": "string",
+            "enum": ["claude", "codex", "gemini"],
+            "description": "Which CLI to invoke"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model override (uses default from config if not specified)"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role preset to use (loads system prompt from roles/)",
+            "enum": ["example_analyst", "hypothesis_scientist", "implementer", "debugger", "refiner", "judge"]
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The prompt to send to the CLI"
+          },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "File paths to include as context"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory for the command"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "default": 300,
+            "description": "Timeout for the CLI command"
+          },
+          "output_schema": {
+            "type": "string",
+            "description": "JSON schema path for structured output (if supported by CLI)"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "stdout": { "type": "string" },
+          "stderr": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "elapsed_ms": { "type": "integer" },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "input_tokens": { "type": "integer" },
+              "output_tokens": { "type": "integer" }
+            }
+          },
+          "parsed": {
+            "type": "object",
+            "description": "Parsed JSON output if output_schema was provided"
+          }
+        }
+      },
+      "example": {
+        "input": {
+          "cli": "codex",
+          "role": "implementer",
+          "prompt": "Fix the IndexError in get_active_user by adding an empty-list guard",
+          "files": ["src/auth.py"],
+          "output_schema": "schemas/stage3_output.json"
+        },
+        "output": {
+          "ok": true,
+          "stdout": "{\"changes\": [...], \"test_result\": {...}}",
+          "stderr": "",
+          "exit_code": 0,
+          "elapsed_ms": 3456,
+          "parsed": {
+            "changes": [{"file": "src/auth.py", "diff": "..."}]
+          }
+        }
+      }
+    },
+
+    "zen_consult": {
+      "title": "zen_consult",
+      "description": "Single-model consultation with role-based prompting",
+      "input": {
+        "type": "object",
+        "required": ["task", "provider"],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The task/question for the consultant"
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["codex", "gemini", "claude"],
+            "description": "Which provider to consult"
+          },
+          "role": {
+            "type": "string",
+            "description": "Optional role preset for system prompt"
+          },
+          "context": {
+            "type": "string",
+            "description": "Additional context (from zen_pack_context)"
+          },
+          "output_schema": {
+            "type": "string",
+            "description": "Path to JSON schema for structured output"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "provider": { "type": "string" },
+          "response": { "type": "string" },
+          "structured": { "type": "object" },
+          "elapsed_ms": { "type": "integer" },
+          "error": { "type": "string" }
+        }
+      },
+      "example": {
+        "input": {
+          "task": "Analyze the root cause of IndexError in auth.py line 42",
+          "provider": "gemini",
+          "role": "example_analyst",
+          "context": "# src/auth.py\\n..."
+        },
+        "output": {
+          "ok": true,
+          "provider": "gemini",
+          "response": "Based on analysis...",
+          "elapsed_ms": 2100
+        }
+      }
+    },
+
+    "zen_ensemble_generate": {
+      "title": "zen_ensemble_generate",
+      "description": "Generate candidates from multiple providers in parallel",
+      "input": {
+        "type": "object",
+        "required": ["task", "providers"],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The task for all providers"
+          },
+          "providers": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["codex", "gemini", "claude"] },
+            "minItems": 2,
+            "description": "Providers to query in parallel"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role preset for all providers"
+          },
+          "context": {
+            "type": "string",
+            "description": "Shared context for all providers"
+          },
+          "output_schema": {
+            "type": "string",
+            "description": "Path to JSON schema for structured output"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "provider": { "type": "string" },
+                "response": { "type": "string" },
+                "structured": { "type": "object" },
+                "elapsed_ms": { "type": "integer" }
+              }
+            }
+          },
+          "total_elapsed_ms": { "type": "integer" },
+          "failed_providers": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "example": {
+        "input": {
+          "task": "Generate top 3 hypotheses for the IndexError in auth.py",
+          "providers": ["codex", "gemini"],
+          "role": "hypothesis_scientist",
+          "output_schema": "schemas/stage2_output.json"
+        },
+        "output": {
+          "ok": true,
+          "candidates": [
+            {"id": "C1", "provider": "codex", "response": "..."},
+            {"id": "C2", "provider": "gemini", "response": "..."}
+          ],
+          "total_elapsed_ms": 4500
+        }
+      }
+    },
+
+    "zen_select_best": {
+      "title": "zen_select_best",
+      "description": "Select best candidate using tests-first methodology",
+      "input": {
+        "type": "object",
+        "required": ["candidates"],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "provider": { "type": "string" },
+                "content": { "type": "string" }
+              }
+            },
+            "description": "Candidates to evaluate"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["tests_first", "llm_judge", "hybrid", "voting"],
+            "default": "tests_first",
+            "description": "Selection mode (tests_first recommended)"
+          },
+          "test_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate_id": { "type": "string" },
+                "passed": { "type": "boolean" },
+                "output": { "type": "string" }
+              }
+            },
+            "description": "Test results for each candidate"
+          },
+          "lint_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate_id": { "type": "string" },
+                "warnings": { "type": "integer" },
+                "errors": { "type": "integer" }
+              }
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Custom criteria for LLM judge mode"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "selected": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "provider": { "type": "string" },
+              "final_score": { "type": "number" }
+            }
+          },
+          "selection_reason": { "type": "string" },
+          "all_scores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "test_score": { "type": "number" },
+                "lint_score": { "type": "number" },
+                "judge_score": { "type": "number" },
+                "final_score": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "input": {
+          "candidates": [
+            {"id": "C1", "provider": "codex", "content": "..."},
+            {"id": "C2", "provider": "gemini", "content": "..."}
+          ],
+          "mode": "tests_first",
+          "test_results": [
+            {"candidate_id": "C1", "passed": true},
+            {"candidate_id": "C2", "passed": false}
+          ]
+        },
+        "output": {
+          "ok": true,
+          "selected": {"id": "C1", "provider": "codex", "final_score": 0.95},
+          "selection_reason": "Only candidate that passed verification test"
+        }
+      }
+    },
+
+    "zen_pack_context": {
+      "title": "zen_pack_context",
+      "description": "Pack files and context intelligently for consultation",
+      "input": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Files to include"
+          },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Error logs to include"
+          },
+          "observations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Observations from analysis"
+          },
+          "constraints": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Constraints to preserve"
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["analyze", "hypothesize", "implement", "debug", "improve"],
+            "description": "Stage for stage-specific packing strategy"
+          },
+          "max_chars": {
+            "type": "integer",
+            "description": "Override max character limit"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "context": {
+            "type": "string",
+            "description": "Packed context string"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "files_included": { "type": "integer" },
+              "total_chars": { "type": "integer" },
+              "truncated": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "example": {
+        "input": {
+          "files": ["src/auth.py", "tests/test_auth.py"],
+          "errors": ["IndexError: list index out of range at line 42"],
+          "stage": "analyze"
+        },
+        "output": {
+          "ok": true,
+          "context": "## Error Log\\n...\\n\\n## src/auth.py\\n...",
+          "stats": {
+            "files_included": 2,
+            "total_chars": 5000,
+            "truncated": false
+          }
+        }
+      }
+    },
+
+    "zen_run_stage": {
+      "title": "zen_run_stage",
+      "description": "Execute a specific workflow stage",
+      "input": {
+        "type": "object",
+        "required": ["stage", "input"],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": ["analyze", "hypothesize", "implement", "debug", "improve"],
+            "description": "Which stage to execute"
+          },
+          "input": {
+            "type": "object",
+            "description": "Stage-specific input (see stage schemas)"
+          },
+          "force_topology": {
+            "type": "string",
+            "enum": ["SAS", "CENTRALIZED"],
+            "description": "Override default topology"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "stage": { "type": "string" },
+          "result": { "type": "object" },
+          "topology_used": { "type": "string" },
+          "consults_used": { "type": "integer" },
+          "next_stage": { "type": "string" }
+        }
+      },
+      "example": {
+        "input": {
+          "stage": "hypothesize",
+          "input": {
+            "observations": ["IndexError at line 42"],
+            "constraints": ["Must not break API"]
+          }
+        },
+        "output": {
+          "ok": true,
+          "stage": "hypothesize",
+          "result": {
+            "hypotheses": [...],
+            "selected": "H1"
+          },
+          "topology_used": "CENTRALIZED",
+          "consults_used": 2,
+          "next_stage": "implement"
+        }
+      }
+    },
+
+    "zen_workflow_state": {
+      "title": "zen_workflow_state",
+      "description": "Get current workflow state and budget usage",
+      "input": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "current_stage": { "type": "string" },
+          "stages_completed": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "consults_used": { "type": "integer" },
+              "consults_remaining": { "type": "integer" },
+              "max_consults": { "type": "integer" }
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stage": { "type": "string" },
+                "provider": { "type": "string" },
+                "elapsed_ms": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "zen_get_metrics": {
+      "title": "zen_get_metrics",
+      "description": "Get paper-aligned coordination metrics",
+      "input": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "coordination_overhead_percent": {
+            "type": "number",
+            "description": "O% = (MAS_turns - SAS_turns) / SAS_turns × 100"
+          },
+          "efficiency_score": {
+            "type": "number",
+            "description": "Ec = success_rate / relative_overhead"
+          },
+          "consults_per_stage": {
+            "type": "number",
+            "description": "Average consults per stage"
+          },
+          "test_coverage_rate": {
+            "type": "number",
+            "description": "Selections that had test signals"
+          },
+          "targets": {
+            "type": "object",
+            "properties": {
+              "overhead_target": { "type": "string", "example": "< 300%" },
+              "efficiency_target": { "type": "string", "example": "> 0.4" },
+              "test_coverage_target": { "type": "string", "example": "> 80%" }
+            }
+          }
+        }
+      }
+    },
+
+    "zen_list_providers": {
+      "title": "zen_list_providers",
+      "description": "List available CLI providers and their status",
+      "input": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "enabled": { "type": "boolean" },
+                "command": { "type": "string" },
+                "model": { "type": "string" },
+                "capabilities": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "trust_score": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,487 @@
+# Skill Manifest - Dynamic Tool Loading Configuration
+#
+# Based on MAKER paper principles:
+# - MAD (Maximal Agentic Decomposition): Break tasks into micro-steps
+# - Minimize context overhead by loading only needed tools
+# - Each skill declares its tool requirements explicitly
+#
+# Tool loading priority:
+# 1. Core tools (always loaded)
+# 2. Stage tools (loaded when entering stage)
+# 3. Skill tools (loaded when executing specific skill)
+# 4. Micro-step tools (most granular, loaded on-demand)
+
+# =============================================================================
+# TOOL DEFINITIONS
+# =============================================================================
+# Context cost approximations (tokens added to LLM context)
+# Lower is better for context efficiency
+
+tools:
+  # Core tools (always available) - Total: ~300 tokens
+  - name: zen_list_providers
+    description: List available CLI providers
+    context_cost: 50
+    category: core
+
+  - name: zen_get_skill
+    description: Load skill definition on-demand
+    context_cost: 100
+    category: core
+
+  - name: zen_workflow_state
+    description: Check current workflow state
+    context_cost: 150
+    category: core
+
+  # Context tools - ~400 tokens
+  - name: zen_pack_context
+    description: Smart context packing for LLM calls
+    context_cost: 200
+    category: context
+
+  - name: zen_log_evidence
+    description: Log to reasoning chain
+    context_cost: 150
+    category: evidence
+
+  - name: zen_get_evidence_chain
+    description: Query evidence trail
+    context_cost: 150
+    category: evidence
+
+  # Consultation tools - ~600 tokens
+  - name: zen_consult
+    description: Single model consultation
+    context_cost: 200
+    category: consultation
+
+  - name: zen_consult_with_role
+    description: Consultation with persona
+    context_cost: 250
+    category: consultation
+
+  - name: zen_ensemble_generate
+    description: Multi-model candidate generation
+    context_cost: 300
+    category: consultation
+
+  - name: zen_select_best
+    description: Select best candidate
+    context_cost: 200
+    category: selection
+
+  # MAKER-style tools - ~500 tokens
+  - name: zen_consensus_vote
+    description: First-to-ahead-by-k voting
+    context_cost: 250
+    category: maker
+
+  - name: zen_validate_content
+    description: Red-flag validation
+    context_cost: 150
+    category: maker
+
+  - name: zen_vote_micro_step
+    description: Vote on a micro-step result
+    context_cost: 200
+    category: maker
+
+  - name: zen_calibrate
+    description: Calibrate voting parameters
+    context_cost: 200
+    category: maker
+
+  # Verification tools - ~400 tokens
+  - name: zen_verify
+    description: Run tests/lint/type-check
+    context_cost: 200
+    category: verification
+
+  - name: zen_apply_patch
+    description: Apply unified diff safely
+    context_cost: 250
+    category: workspace
+
+  - name: zen_restore_from_backup
+    description: Rollback changes
+    context_cost: 150
+    category: workspace
+
+  # Workflow tools - ~300 tokens
+  - name: zen_run_stage
+    description: Execute workflow stage
+    context_cost: 200
+    category: workflow
+
+  - name: zen_get_role
+    description: Get persona prompt
+    context_cost: 100
+    category: workflow
+
+  - name: zen_get_schema
+    description: Get output schema
+    context_cost: 100
+    category: workflow
+
+  - name: zen_get_coordination_policy
+    description: Get paper-aligned rules
+    context_cost: 150
+    category: workflow
+
+  - name: zen_get_metrics
+    description: Paper-aligned metrics
+    context_cost: 100
+    category: metrics
+
+
+# =============================================================================
+# SKILL DEFINITIONS
+# =============================================================================
+# Each skill maps to specific micro-steps and declares required tools
+
+skills:
+  # ---------------------------------------------------------------------------
+  # ANALYZE STAGE SKILLS
+  # ---------------------------------------------------------------------------
+  - name: spec_extraction
+    stage: analyze
+    description: Extract input/output specifications from code or documentation
+    prompt_file: stage1_example_analysis.md
+    schema_file: stage1_output.json
+    role: example_analyst
+    priority: 1
+    micro_steps:
+      - s1_spec_extract
+    required_tools:
+      - zen_pack_context
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: edge_case_generation
+    stage: analyze
+    description: Generate edge cases for testing based on specifications
+    prompt_file: stage1_example_analysis.md
+    schema_file: stage1_output.json
+    role: example_analyst
+    priority: 2
+    micro_steps:
+      - s2_edge_case
+    required_tools:
+      - zen_pack_context
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+      - zen_consensus_vote
+
+  - name: mre_creation
+    stage: analyze
+    description: Create minimal reproducible examples for issues
+    prompt_file: stage1_example_analysis.md
+    schema_file: stage1_output.json
+    role: example_analyst
+    priority: 3
+    micro_steps:
+      - s3_mre
+    required_tools:
+      - zen_pack_context
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  # ---------------------------------------------------------------------------
+  # HYPOTHESIZE STAGE SKILLS
+  # ---------------------------------------------------------------------------
+  - name: root_cause_analysis
+    stage: hypothesize
+    description: Identify potential root causes for issues
+    prompt_file: stage2_hypothesis.md
+    schema_file: stage2_output.json
+    role: hypothesis_scientist
+    priority: 1
+    micro_steps:
+      - h1_root_cause
+    required_tools:
+      - zen_consult
+      - zen_log_evidence
+    optional_tools:
+      - zen_ensemble_generate
+      - zen_consensus_vote
+      - zen_validate_content
+
+  - name: verification_design
+    stage: hypothesize
+    description: Design experiments to verify or falsify hypotheses
+    prompt_file: stage2_hypothesis.md
+    schema_file: stage2_output.json
+    role: hypothesis_scientist
+    priority: 2
+    micro_steps:
+      - h2_verification
+    required_tools:
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: hypothesis_ensemble
+    stage: hypothesize
+    description: Generate multiple competing hypotheses (best use of ensemble!)
+    prompt_file: stage2_hypothesis.md
+    schema_file: stage2_output.json
+    role: hypothesis_scientist
+    priority: 3
+    micro_steps:
+      - h1_root_cause
+      - h2_verification
+    required_tools:
+      - zen_ensemble_generate
+      - zen_select_best
+      - zen_validate_content
+      - zen_log_evidence
+    optional_tools:
+      - zen_consensus_vote
+      - zen_pack_context
+
+  # ---------------------------------------------------------------------------
+  # IMPLEMENT STAGE SKILLS
+  # ---------------------------------------------------------------------------
+  - name: patch_generation
+    stage: implement
+    description: Generate minimal code patches for single files
+    prompt_file: stage3_implementation.md
+    schema_file: stage3_output.json
+    role: implementer
+    priority: 1
+    micro_steps:
+      - c1_minimal_patch
+    required_tools:
+      - zen_apply_patch
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: compile_verification
+    stage: implement
+    description: Verify patches pass compilation and type checking
+    prompt_file: stage3_implementation.md
+    schema_file: stage3_output.json
+    role: implementer
+    priority: 2
+    micro_steps:
+      - c2_compile_check
+    required_tools:
+      - zen_verify
+      - zen_apply_patch
+    optional_tools:
+      - zen_log_evidence
+
+  - name: safe_implementation
+    stage: implement
+    description: Full implementation with automatic backup and rollback
+    prompt_file: stage3_implementation.md
+    schema_file: stage3_output.json
+    role: implementer
+    priority: 3
+    micro_steps:
+      - c1_minimal_patch
+      - c2_compile_check
+    required_tools:
+      - zen_apply_patch
+      - zen_verify
+      - zen_restore_from_backup
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+      - zen_validate_content
+
+  # ---------------------------------------------------------------------------
+  # DEBUG STAGE SKILLS
+  # ---------------------------------------------------------------------------
+  - name: failure_classification
+    stage: debug
+    description: Classify failure types from error logs
+    prompt_file: stage4_debug_loop.md
+    schema_file: stage4_output.json
+    role: debugger
+    priority: 1
+    micro_steps:
+      - d1_failure_label
+    required_tools:
+      - zen_pack_context
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: experiment_planning
+    stage: debug
+    description: Plan next debugging experiment
+    prompt_file: stage4_debug_loop.md
+    schema_file: stage4_output.json
+    role: debugger
+    priority: 2
+    micro_steps:
+      - d2_next_experiment
+    required_tools:
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: debug_loop
+    stage: debug
+    description: Full debug iteration with rollback support
+    prompt_file: stage4_debug_loop.md
+    schema_file: stage4_output.json
+    role: debugger
+    priority: 3
+    micro_steps:
+      - d1_failure_label
+      - d2_next_experiment
+    required_tools:
+      - zen_pack_context
+      - zen_verify
+      - zen_restore_from_backup
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+      - zen_apply_patch
+
+  # ---------------------------------------------------------------------------
+  # IMPROVE STAGE SKILLS
+  # ---------------------------------------------------------------------------
+  - name: refactoring
+    stage: improve
+    description: Apply safe refactorings with safety checklist
+    prompt_file: stage5_recursive_improve.md
+    schema_file: stage5_output.json
+    role: refiner
+    priority: 1
+    micro_steps:
+      - r1_refactor
+    required_tools:
+      - zen_apply_patch
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+      - zen_restore_from_backup
+
+  - name: performance_optimization
+    stage: improve
+    description: Optimize performance with measurement
+    prompt_file: stage5_recursive_improve.md
+    schema_file: stage5_output.json
+    role: refiner
+    priority: 2
+    micro_steps:
+      - r2_perf
+    required_tools:
+      - zen_apply_patch
+      - zen_verify
+      - zen_log_evidence
+    optional_tools:
+      - zen_consult
+
+  - name: code_review
+    stage: improve
+    description: Review code with ensemble suggestions
+    prompt_file: stage5_recursive_improve.md
+    schema_file: stage5_output.json
+    role: refiner
+    priority: 3
+    micro_steps:
+      - r1_refactor
+      - r2_perf
+    required_tools:
+      - zen_ensemble_generate
+      - zen_select_best
+      - zen_log_evidence
+    optional_tools:
+      - zen_apply_patch
+      - zen_verify
+
+
+# =============================================================================
+# TOOL LOADING POLICIES
+# =============================================================================
+
+policies:
+  # Maximum tools to expose at once (context budget)
+  max_tools: 10
+
+  # Core tools (always loaded regardless of stage)
+  core_tools:
+    - zen_list_providers
+    - zen_get_skill
+    - zen_workflow_state
+
+  # Stage-specific tool budgets
+  stage_budgets:
+    analyze: 6      # Focus on context gathering
+    hypothesize: 8  # Need ensemble + voting
+    implement: 6    # Patch + verify
+    debug: 6        # Verify + rollback
+    improve: 8      # Ensemble review OK
+
+  # Default disabled tools (for minimal context)
+  default_disabled:
+    - zen_run_stage          # Use micro-steps instead
+    - zen_get_coordination_policy  # One-time read
+    - zen_get_metrics        # On-demand only
+
+  # MAKER-style micro-step voting defaults
+  voting_defaults:
+    default_k: 3
+    max_rounds: 12
+    # Use tool oracle when available
+    prefer_oracle: true
+    # Red-flag thresholds
+    max_response_chars: 10000
+    min_response_chars: 10
+
+
+# =============================================================================
+# COORDINATION RULES (from papers)
+# =============================================================================
+
+coordination:
+  # From "Towards a Science of Scaling Agent Systems"
+  capability_threshold: 0.45  # Skip ensemble above this confidence
+  max_consult_per_stage: 2
+  max_consult_total: 6
+
+  # From MAKER paper
+  red_flag_on_format_error: true
+  discard_dont_repair: true
+  decorrelation_strategy: multi_provider  # Use different LLMs
+
+  # Stage-specific rules
+  stage_rules:
+    analyze:
+      ensemble_allowed: false
+      max_consults: 2
+
+    hypothesize:
+      ensemble_allowed: true      # BEST stage for ensemble!
+      max_consults: 3
+      voting_recommended: true
+
+    implement:
+      ensemble_allowed: false     # Tool-heavy, MAS degrades performance
+      max_consults: 1
+      single_agent_preferred: true
+
+    debug:
+      ensemble_allowed: false     # Paper shows MAS degrades here
+      max_consults: 1
+      single_agent_only: true
+      max_iterations: 5
+
+    improve:
+      ensemble_allowed: true      # OK for review suggestions
+      max_consults: 2
+      only_after_tests_pass: true

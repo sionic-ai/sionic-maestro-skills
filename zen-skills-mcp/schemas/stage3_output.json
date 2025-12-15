@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 3: Implementation Output",
+  "description": "Structured output from the Implementation stage",
+  "type": "object",
+  "required": ["changes", "test_result", "next_action"],
+  "properties": {
+    "changes": {
+      "type": "array",
+      "description": "Changes applied to the codebase",
+      "items": {
+        "type": "object",
+        "required": ["file", "diff"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Path to modified file"
+          },
+          "diff": {
+            "type": "string",
+            "description": "Unified diff of changes"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the change"
+          },
+          "lines_changed": {
+            "type": "integer",
+            "description": "Number of lines modified"
+          }
+        }
+      }
+    },
+    "test_result": {
+      "type": "object",
+      "required": ["command", "passed"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Test command that was run"
+        },
+        "exit_code": {
+          "type": "integer",
+          "description": "Exit code from test command"
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Did the test pass?"
+        },
+        "output": {
+          "type": "string",
+          "description": "Test output (truncated if long)"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "description": "How long the test took"
+        }
+      }
+    },
+    "lint_result": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "boolean",
+          "description": "Did lint pass?"
+        },
+        "warnings": {
+          "type": "integer",
+          "description": "Number of warnings"
+        },
+        "errors": {
+          "type": "integer",
+          "description": "Number of errors"
+        }
+      }
+    },
+    "next_action": {
+      "type": "string",
+      "enum": ["proceed_to_improve", "proceed_to_debug", "revert_and_retry", "escalate"],
+      "description": "What to do next based on results"
+    },
+    "rollback_command": {
+      "type": "string",
+      "description": "Command to undo this change if needed"
+    }
+  },
+  "examples": [
+    {
+      "changes": [
+        {
+          "file": "src/auth.py",
+          "diff": "--- a/src/auth.py\n+++ b/src/auth.py\n@@ -40,7 +40,9 @@ def get_active_user(users):\n-    return users[0]\n+    if not users:\n+        return None\n+    return users[0]",
+          "description": "Add empty list guard before accessing first element",
+          "lines_changed": 3
+        }
+      ],
+      "test_result": {
+        "command": "pytest tests/test_auth.py::test_login -v",
+        "exit_code": 0,
+        "passed": true,
+        "output": "tests/test_auth.py::test_login PASSED [100%]",
+        "duration_ms": 1234
+      },
+      "lint_result": {
+        "passed": true,
+        "warnings": 0,
+        "errors": 0
+      },
+      "next_action": "proceed_to_improve",
+      "rollback_command": "git checkout src/auth.py"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 4: Debug Loop Output",
+  "description": "Structured output from a single debug iteration",
+  "type": "object",
+  "required": ["iteration", "error_analysis", "change", "test_result", "next_action"],
+  "properties": {
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Current iteration number"
+    },
+    "error_analysis": {
+      "type": "object",
+      "required": ["error_type", "is_new_error"],
+      "properties": {
+        "error_type": {
+          "type": "string",
+          "description": "Type of error (e.g., IndexError, TypeError)"
+        },
+        "is_new_error": {
+          "type": "boolean",
+          "description": "Is this different from the original/previous error?"
+        },
+        "is_related_to_change": {
+          "type": "boolean",
+          "description": "Does this error stem from our change?"
+        },
+        "root_cause_theory": {
+          "type": "string",
+          "description": "What we think caused this specific error"
+        }
+      }
+    },
+    "hypothesis_update": {
+      "type": "object",
+      "properties": {
+        "original_hypothesis": {
+          "type": "string",
+          "description": "The hypothesis we're testing"
+        },
+        "still_valid": {
+          "type": "boolean",
+          "description": "Do we still believe the original hypothesis?"
+        },
+        "new_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Updated confidence in hypothesis"
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Evidence for/against hypothesis validity"
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": ["file", "diff"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "File being modified"
+        },
+        "diff": {
+          "type": "string",
+          "description": "Unified diff (should be minimal!)"
+        },
+        "description": {
+          "type": "string",
+          "description": "What this change attempts to fix"
+        },
+        "lines_changed": {
+          "type": "integer",
+          "maximum": 10,
+          "description": "Should be minimal (1-5 lines ideal)"
+        }
+      }
+    },
+    "test_result": {
+      "type": "object",
+      "required": ["command", "passed"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Test command run"
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Did the test pass?"
+        },
+        "output_summary": {
+          "type": "string",
+          "description": "Brief summary of output"
+        },
+        "compared_to_previous": {
+          "type": "string",
+          "enum": ["same_error", "new_error", "passed", "regression"],
+          "description": "How does this compare to previous iteration?"
+        }
+      }
+    },
+    "next_action": {
+      "type": "string",
+      "enum": ["continue_debug", "resolved", "revert_all", "escalate", "re_hypothesize"],
+      "description": "What to do next"
+    },
+    "iterations_remaining": {
+      "type": "integer",
+      "description": "How many iterations left before escalation"
+    }
+  },
+  "examples": [
+    {
+      "iteration": 2,
+      "error_analysis": {
+        "error_type": "AttributeError",
+        "is_new_error": true,
+        "is_related_to_change": true,
+        "root_cause_theory": "Our None return is not handled by caller"
+      },
+      "hypothesis_update": {
+        "original_hypothesis": "Off-by-one error in array access",
+        "still_valid": true,
+        "new_confidence": 0.85,
+        "evidence": "Original error fixed, new error is downstream effect"
+      },
+      "change": {
+        "file": "src/views.py",
+        "diff": "@@ -15,7 +15,8 @@\n user = get_active_user(users)\n-user_id = user.id\n+user_id = user.id if user else None",
+        "description": "Handle None user in caller",
+        "lines_changed": 1
+      },
+      "test_result": {
+        "command": "pytest tests/test_auth.py::test_login -v",
+        "passed": true,
+        "output_summary": "1 passed in 0.12s",
+        "compared_to_previous": "passed"
+      },
+      "next_action": "resolved",
+      "iterations_remaining": 3
+    }
+  ]
+}

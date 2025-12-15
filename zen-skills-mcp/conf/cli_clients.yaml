@@ -1,0 +1,298 @@
+# ============================================
+# CLI Client Configuration
+# ============================================
+# Command templates and role prompt mappings for
+# claude, codex, and gemini CLI tools.
+#
+# Based on "Towards a Science of Scaling Agent Systems" (Kim et al., 2025)
+# - Centralized Consult architecture
+# - Tool-coordination trade-off awareness
+# - Error amplification prevention
+
+version: "1.0"
+
+# --------------------------------------------
+# CLI Client Definitions
+# --------------------------------------------
+clients:
+  claude:
+    name: "Claude CLI (Opus)"
+    description: "Anthropic Claude Opus - most capable model for complex reasoning"
+    command_template: "claude -p {prompt} --model {model}"
+    options:
+      max_turns: "--max-turns {value}"
+      output_format: "--output-format {value}"
+      model: "--model {value}"
+      allowlist: "--allowlist-tools {value}"
+    default_options:
+      model: "opus"
+      max_turns: 3
+      output_format: "text"
+    capabilities:
+      - reasoning
+      - code_review
+      - safety_analysis
+      - complex_debugging
+      - architectural_decisions
+    trust_score: 0.90
+    timeout_seconds: 600
+    retry_count: 2
+
+  codex:
+    name: "OpenAI Codex CLI (GPT-5.2-XHigh)"
+    description: "OpenAI GPT-5.2-XHigh - highest performance code generation"
+    command_template: "codex exec --model {model} {prompt}"
+    options:
+      model: "--model {value}"
+      output_schema: "--output-schema {value}"
+      timeout: "--timeout {value}"
+    default_options:
+      model: "gpt-5.2-xhigh"
+    capabilities:
+      - code_generation
+      - code_completion
+      - refactoring
+      - implementation
+      - algorithm_design
+    trust_score: 0.92
+    timeout_seconds: 900
+    retry_count: 2
+
+  gemini:
+    name: "Google Gemini CLI (3 Pro Preview)"
+    description: "Google Gemini 3 Pro Preview - large context analysis"
+    command_template: "gemini --model {model} {prompt}"
+    options:
+      model: "--model {value}"
+      output_format: "--output-format {value}"
+      sandbox: "--sandbox {value}"
+    default_options:
+      model: "gemini-3-pro-preview"
+      output_format: "json"
+    capabilities:
+      - large_context
+      - multimodal
+      - hypothesis_generation
+      - code_analysis
+      - reasoning
+    trust_score: 0.88
+    timeout_seconds: 600
+    retry_count: 2
+
+# --------------------------------------------
+# Role Definitions (Persona Prompts)
+# --------------------------------------------
+roles:
+  # Stage 1: Example Analysis
+  example_analyst:
+    name: "Example Analyst"
+    stage: analyze
+    prompt_file: "roles/example_analyst.md"
+    traits:
+      - methodical
+      - observational
+      - detail_oriented
+    focus:
+      - "Extract factual observations from code/logs"
+      - "Identify constraints and invariants"
+      - "Document reproduction steps"
+      - "Separate facts from assumptions"
+    output_schema: "schemas/stage1_output.json"
+
+  # Stage 2: Hypothesis
+  hypothesis_scientist:
+    name: "Hypothesis Scientist"
+    stage: hypothesize
+    prompt_file: "roles/hypothesis_scientist.md"
+    traits:
+      - scientific
+      - creative
+      - falsificationist
+    focus:
+      - "Generate competing hypotheses"
+      - "Define testable predictions"
+      - "Identify potential counter-examples"
+      - "Rank by falsifiability"
+    output_schema: "schemas/stage2_output.json"
+
+  # Stage 3: Implementation
+  implementer:
+    name: "Implementer"
+    stage: implement
+    prompt_file: "roles/implementer.md"
+    traits:
+      - pragmatic
+      - minimal_change
+      - test_driven
+    focus:
+      - "Apply smallest possible fix"
+      - "One change at a time"
+      - "Test after every change"
+      - "Avoid side effects"
+    output_schema: "schemas/stage3_output.json"
+
+  # Stage 4: Debug Loop
+  debugger:
+    name: "Debugger"
+    stage: debug
+    prompt_file: "roles/debugger.md"
+    traits:
+      - systematic
+      - patient
+      - minimal_intervention
+    focus:
+      - "Analyze new error vs previous"
+      - "Update hypothesis confidence"
+      - "Make single smallest change"
+      - "Verify before proceeding"
+    output_schema: "schemas/stage4_output.json"
+
+  # Stage 5: Recursive Improvement
+  refiner:
+    name: "Refiner"
+    stage: improve
+    prompt_file: "roles/refiner.md"
+    traits:
+      - quality_focused
+      - forward_thinking
+      - documentation_oriented
+    focus:
+      - "Add regression tests"
+      - "Identify edge cases"
+      - "Document lessons learned"
+      - "Prevent recurrence"
+    output_schema: "schemas/stage5_output.json"
+
+  # Special: Judge for candidate selection
+  judge:
+    name: "Judge"
+    stage: any
+    prompt_file: "roles/judge.md"
+    traits:
+      - objective
+      - criteria_based
+      - fair
+    focus:
+      - "Evaluate against rubric"
+      - "Score objectively"
+      - "Provide reasoning"
+      - "Select best candidate"
+    output_schema: "schemas/judge_output.json"
+
+# --------------------------------------------
+# Stage → Role → Client Mapping
+# --------------------------------------------
+stage_mapping:
+  analyze:
+    primary_role: example_analyst
+    preferred_clients:
+      - gemini  # Good for large context analysis
+      - claude  # Good for reasoning
+    topology: SAS  # Single agent sufficient
+    max_consults: 2
+
+  hypothesize:
+    primary_role: hypothesis_scientist
+    preferred_clients:
+      - codex   # Code-aware hypotheses
+      - gemini  # Diverse perspectives
+      - claude  # Deep reasoning
+    topology: CENTRALIZED  # Generate parallel, verify central
+    max_consults: 3
+    ensemble_allowed: true
+
+  implement:
+    primary_role: implementer
+    preferred_clients:
+      - codex  # Primary for code generation
+    topology: SAS  # Single agent (tool-heavy, paper rule)
+    max_consults: 1
+    ensemble_allowed: false
+
+  debug:
+    primary_role: debugger
+    preferred_clients:
+      - codex  # Code fixes
+      - claude # Complex reasoning
+    topology: SAS  # Single agent (sequential task, paper rule)
+    max_consults: 1
+    max_iterations: 5
+    ensemble_allowed: false
+
+  improve:
+    primary_role: refiner
+    preferred_clients:
+      - claude  # Safety review
+      - gemini  # Edge case analysis
+    topology: CENTRALIZED  # Review can benefit from diversity
+    max_consults: 2
+    ensemble_allowed: true
+
+# --------------------------------------------
+# Coordination Policies (Paper-Aligned)
+# --------------------------------------------
+policies:
+  # Capability Saturation Gate (~45% from paper)
+  capability_threshold: 0.45
+
+  # When to skip ensemble and use single agent
+  skip_ensemble_conditions:
+    - "baseline_confidence >= 0.45"
+    - "stage in ['implement', 'debug']"
+    - "tool_intensity > 3"
+    - "sequentiality_score > 0.7"
+
+  # Error amplification prevention
+  error_amplification:
+    independent_mode: FORBIDDEN  # 17.2x error amplification
+    centralized_mode: PREFERRED  # 4.4x (contained)
+    voting_purpose: CANDIDATE_DIVERSITY_ONLY
+    final_selection: TEST_BASED
+
+  # Budget limits
+  budgets:
+    max_consults_per_stage: 2
+    max_consults_total: 6
+    max_debug_iterations: 5
+    timeout_total_seconds: 1800
+
+# --------------------------------------------
+# Topology Definitions
+# --------------------------------------------
+topologies:
+  SAS:
+    name: "Single Agent System"
+    description: "Orchestrator handles directly, no sub-agent calls"
+    error_multiplier: 1.0
+    use_when:
+      - "High baseline confidence (>=45%)"
+      - "Sequential tasks (debugging)"
+      - "Tool-heavy operations"
+
+  CENTRALIZED:
+    name: "Centralized Coordination"
+    description: "Generate parallel, verify through central bottleneck"
+    error_multiplier: 4.4
+    use_when:
+      - "Need diverse candidates"
+      - "Verification is critical"
+      - "Error containment needed"
+
+  DECENTRALIZED:
+    name: "Decentralized"
+    description: "Agents coordinate peer-to-peer"
+    error_multiplier: 8.2
+    use_when:
+      - "Web navigation tasks"
+      - "Research/exploration"
+    avoid_when:
+      - "Coding tasks"
+      - "Sequential operations"
+
+  INDEPENDENT:
+    name: "Independent (FORBIDDEN for coding)"
+    description: "Agents work independently, majority vote"
+    error_multiplier: 17.2
+    use_when: []  # Never for coding tasks
+    forbidden: true
+    reason: "17.2x error amplification unacceptable for code"

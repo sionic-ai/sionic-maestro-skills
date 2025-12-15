@@ -1,0 +1,198 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 5: Recursive Improvement Output",
+  "description": "Structured output from the Recursive Improvement stage",
+  "type": "object",
+  "required": ["summary", "regression_tests", "lessons", "status"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "required": ["root_cause", "fix_description"],
+      "properties": {
+        "root_cause": {
+          "type": "string",
+          "description": "Final determination of root cause"
+        },
+        "fix_description": {
+          "type": "string",
+          "description": "What was changed and why"
+        },
+        "files_modified": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "All files that were modified"
+        },
+        "total_lines_changed": {
+          "type": "integer",
+          "description": "Total lines changed across all files"
+        }
+      }
+    },
+    "regression_tests": {
+      "type": "array",
+      "description": "New tests added to prevent recurrence",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["test_name", "description"],
+        "properties": {
+          "test_name": {
+            "type": "string",
+            "description": "Name of the test function"
+          },
+          "test_file": {
+            "type": "string",
+            "description": "File where test was added"
+          },
+          "description": {
+            "type": "string",
+            "description": "What this test verifies"
+          },
+          "edge_case_covered": {
+            "type": "string",
+            "description": "Which edge case this test covers"
+          }
+        }
+      }
+    },
+    "edge_cases_identified": {
+      "type": "array",
+      "description": "Edge cases discovered during improvement",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "type": "string",
+            "description": "Description of the edge case"
+          },
+          "test_added": {
+            "type": "boolean",
+            "description": "Was a test added for this?"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Risk if this edge case is not covered"
+          }
+        }
+      }
+    },
+    "code_quality": {
+      "type": "object",
+      "properties": {
+        "lint_clean": {
+          "type": "boolean",
+          "description": "No lint errors/warnings?"
+        },
+        "type_hints_complete": {
+          "type": "boolean",
+          "description": "Type hints added where needed?"
+        },
+        "docstrings_added": {
+          "type": "boolean",
+          "description": "Documentation added where needed?"
+        },
+        "complexity_acceptable": {
+          "type": "boolean",
+          "description": "Code complexity within acceptable range?"
+        }
+      }
+    },
+    "lessons": {
+      "type": "object",
+      "required": ["root_cause_category", "prevention_checklist"],
+      "properties": {
+        "root_cause_category": {
+          "type": "string",
+          "enum": [
+            "off_by_one",
+            "null_reference",
+            "type_error",
+            "race_condition",
+            "logic_error",
+            "missing_validation",
+            "configuration",
+            "dependency",
+            "other"
+          ],
+          "description": "Category of the root cause"
+        },
+        "prevention_checklist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Checklist items to prevent similar bugs"
+        },
+        "similar_patterns_to_check": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Other code locations with similar patterns"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["complete", "needs_review", "escalate"],
+      "description": "Final status of the improvement"
+    },
+    "termination_reason": {
+      "type": "string",
+      "description": "Why improvement was stopped (for audit trail)"
+    }
+  },
+  "examples": [
+    {
+      "summary": {
+        "root_cause": "Missing empty-list validation in get_active_user()",
+        "fix_description": "Added None return for empty list, updated 2 callers to handle None",
+        "files_modified": ["src/auth.py", "src/views.py"],
+        "total_lines_changed": 5
+      },
+      "regression_tests": [
+        {
+          "test_name": "test_get_active_user_empty_list",
+          "test_file": "tests/test_auth.py",
+          "description": "Verify None returned for empty users list",
+          "edge_case_covered": "Empty input"
+        },
+        {
+          "test_name": "test_get_active_user_single_user",
+          "test_file": "tests/test_auth.py",
+          "description": "Verify single user returned correctly",
+          "edge_case_covered": "Boundary: single element"
+        }
+      ],
+      "edge_cases_identified": [
+        {
+          "case": "None passed instead of empty list",
+          "test_added": true,
+          "risk_level": "medium"
+        },
+        {
+          "case": "List with None elements",
+          "test_added": false,
+          "risk_level": "low"
+        }
+      ],
+      "code_quality": {
+        "lint_clean": true,
+        "type_hints_complete": true,
+        "docstrings_added": true,
+        "complexity_acceptable": true
+      },
+      "lessons": {
+        "root_cause_category": "missing_validation",
+        "prevention_checklist": [
+          "Always validate collection is non-empty before indexing",
+          "Return Optional types when None is possible",
+          "Add explicit test for empty inputs"
+        ],
+        "similar_patterns_to_check": [
+          "src/users.py:get_first_admin()",
+          "src/teams.py:get_primary_member()"
+        ]
+      },
+      "status": "complete",
+      "termination_reason": "All edge cases covered, lint clean, regression tests added"
+    }
+  ]
+}

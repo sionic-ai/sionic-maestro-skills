@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 2: Hypothesis Output",
+  "description": "Structured output from the Hypothesis stage",
+  "type": "object",
+  "required": ["hypotheses", "selected", "verification_plan"],
+  "properties": {
+    "hypotheses": {
+      "type": "array",
+      "description": "Competing hypotheses with testable predictions",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["id", "claim", "prediction", "verification_test", "confidence"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^H[0-9]+$",
+            "description": "Hypothesis identifier (H1, H2, etc.)"
+          },
+          "claim": {
+            "type": "string",
+            "description": "The specific root cause claim"
+          },
+          "prediction": {
+            "type": "string",
+            "description": "What should happen if this hypothesis is true"
+          },
+          "verification_test": {
+            "type": "string",
+            "description": "How to verify or falsify this hypothesis"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Estimated likelihood this is correct"
+          },
+          "counter_evidence": {
+            "type": "string",
+            "description": "What would disprove this hypothesis"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Which model generated this (for ensemble tracking)"
+          }
+        }
+      }
+    },
+    "selected": {
+      "type": "string",
+      "pattern": "^H[0-9]+$",
+      "description": "ID of the selected hypothesis"
+    },
+    "selection_reason": {
+      "type": "string",
+      "description": "Why this hypothesis was selected"
+    },
+    "verification_plan": {
+      "type": "object",
+      "required": ["test_command", "expected_result"],
+      "properties": {
+        "test_command": {
+          "type": "string",
+          "description": "Command to run for verification"
+        },
+        "expected_result": {
+          "type": "string",
+          "description": "What result confirms the hypothesis"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "default": 60,
+          "description": "Timeout for the test"
+        }
+      }
+    },
+    "ensemble_used": {
+      "type": "boolean",
+      "description": "Was multi-model ensemble used for generation?"
+    }
+  },
+  "examples": [
+    {
+      "hypotheses": [
+        {
+          "id": "H1",
+          "claim": "Off-by-one error: code accesses users[0] when list can be empty",
+          "prediction": "Adding empty-list guard should prevent IndexError",
+          "verification_test": "Add test case with empty users list",
+          "confidence": 0.75,
+          "counter_evidence": "If error persists with guard, cause is elsewhere",
+          "provider": "codex"
+        },
+        {
+          "id": "H2",
+          "claim": "Test fixture returns empty list incorrectly",
+          "prediction": "Fixing fixture should make test pass",
+          "verification_test": "Check other tests using same fixture",
+          "confidence": 0.50,
+          "counter_evidence": "If other tests pass with same fixture, this is wrong",
+          "provider": "gemini"
+        }
+      ],
+      "selected": "H1",
+      "selection_reason": "Most testable, highest confidence, matches error pattern directly",
+      "verification_plan": {
+        "test_command": "pytest tests/test_auth.py::test_login -v",
+        "expected_result": "Test passes without IndexError",
+        "timeout_seconds": 30
+      },
+      "ensemble_used": true
+    }
+  ]
+}

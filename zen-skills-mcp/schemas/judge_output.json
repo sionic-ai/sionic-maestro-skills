@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Judge Output",
+  "description": "Structured output from the candidate selection judge",
+  "type": "object",
+  "required": ["candidates_evaluated", "selected", "selection_reason"],
+  "properties": {
+    "candidates_evaluated": {
+      "type": "array",
+      "description": "All candidates with their evaluation scores",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "weighted_score"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Candidate identifier"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Which model generated this candidate"
+          },
+          "scores": {
+            "type": "object",
+            "description": "Individual criterion scores (1-5 scale)",
+            "properties": {
+              "test_pass": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Did it pass tests? (5=yes, 1=no)"
+              },
+              "lint_clean": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Lint score (5=clean, 1=many errors)"
+              },
+              "testability": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "How testable is this? (for hypotheses)"
+              },
+              "specificity": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "How specific/actionable?"
+              },
+              "coherence": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Fits with observations?"
+              },
+              "minimal_change": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Is the change minimal? (for implementations)"
+              },
+              "correctness": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Does it address the root cause?"
+              },
+              "readability": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Is the code clear?"
+              }
+            }
+          },
+          "weighted_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Final weighted score (0-1)"
+          },
+          "strengths": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Notable strengths"
+          },
+          "weaknesses": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Notable weaknesses"
+          }
+        }
+      }
+    },
+    "selected": {
+      "type": "string",
+      "description": "ID of the selected candidate (null if none qualify)"
+    },
+    "selection_reason": {
+      "type": "string",
+      "description": "Explanation of why this candidate was selected"
+    },
+    "comparison_notes": {
+      "type": "string",
+      "description": "Notes on how candidates compared"
+    },
+    "selection_mode_used": {
+      "type": "string",
+      "enum": ["tests_first", "llm_judge", "hybrid", "voting"],
+      "description": "Which selection mode was used"
+    },
+    "test_signal_available": {
+      "type": "boolean",
+      "description": "Were test results available for selection?"
+    }
+  },
+  "examples": [
+    {
+      "candidates_evaluated": [
+        {
+          "id": "C1",
+          "provider": "codex",
+          "scores": {
+            "test_pass": 5,
+            "lint_clean": 4,
+            "minimal_change": 5,
+            "correctness": 4,
+            "readability": 4
+          },
+          "weighted_score": 0.89,
+          "strengths": ["Passes all tests", "Very minimal change (3 lines)"],
+          "weaknesses": ["Slightly complex conditional"]
+        },
+        {
+          "id": "C2",
+          "provider": "gemini",
+          "scores": {
+            "test_pass": 3,
+            "lint_clean": 5,
+            "minimal_change": 3,
+            "correctness": 4,
+            "readability": 5
+          },
+          "weighted_score": 0.72,
+          "strengths": ["Clean code", "Good readability"],
+          "weaknesses": ["Fails one edge case test", "Larger change"]
+        }
+      ],
+      "selected": "C1",
+      "selection_reason": "Highest score with all tests passing. C2 failed edge case test.",
+      "comparison_notes": "C1 prioritized due to test_pass being decisive factor",
+      "selection_mode_used": "tests_first",
+      "test_signal_available": true
+    },
+    {
+      "candidates_evaluated": [
+        {
+          "id": "H1",
+          "provider": "codex",
+          "scores": {
+            "testability": 5,
+            "specificity": 4,
+            "coherence": 5
+          },
+          "weighted_score": 0.92,
+          "strengths": ["Easily testable with single test case", "Matches error pattern"],
+          "weaknesses": []
+        },
+        {
+          "id": "H2",
+          "provider": "gemini",
+          "scores": {
+            "testability": 3,
+            "specificity": 3,
+            "coherence": 4
+          },
+          "weighted_score": 0.65,
+          "strengths": ["Alternative perspective"],
+          "weaknesses": ["Hard to verify", "Less specific claim"]
+        }
+      ],
+      "selected": "H1",
+      "selection_reason": "Most testable hypothesis with clear verification path",
+      "comparison_notes": "H1's testability score decisive; H2 would require complex setup to verify",
+      "selection_mode_used": "llm_judge",
+      "test_signal_available": false
+    }
+  ]
+}
