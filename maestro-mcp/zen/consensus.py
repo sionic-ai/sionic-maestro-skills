@@ -488,7 +488,7 @@ def binary_vote(
     provider_callback: Callable,
     k: int = 3,
     max_rounds: int = 9,
-    providers: List[str] = ["codex", "gemini", "claude"],
+    providers: Optional[List[str]] = None,
 ) -> Tuple[bool, float]:
     """
     Vote on a yes/no question.
@@ -496,6 +496,9 @@ def binary_vote(
     Returns:
         (answer: bool, confidence: float)
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini", "claude"]
+
     prompt = f"""{question}
 
 Answer with ONLY "yes" or "no" (lowercase, no explanation)."""
@@ -527,7 +530,7 @@ def select_from_options(
     provider_callback: Callable,
     k: int = 3,
     max_rounds: int = 12,
-    providers: List[str] = ["codex", "gemini", "claude"],
+    providers: Optional[List[str]] = None,
 ) -> Tuple[str, float]:
     """
     Vote to select one option from a list.
@@ -535,6 +538,9 @@ def select_from_options(
     Returns:
         (selected_option: str, confidence: float)
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini", "claude"]
+
     options_text = "\n".join(f"{i+1}. {opt}" for i, opt in enumerate(options))
     prompt = f"""{question}
 
@@ -571,7 +577,7 @@ def rank_items(
     provider_callback: Callable,
     k: int = 2,
     max_rounds: int = 9,
-    providers: List[str] = ["codex", "gemini"],
+    providers: Optional[List[str]] = None,
 ) -> Tuple[List[str], float]:
     """
     Vote to rank items by some criterion.
@@ -579,6 +585,9 @@ def rank_items(
     Returns:
         (ranked_items: List[str], confidence: float)
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini"]
+
     items_text = "\n".join(f"- {item}" for item in items)
     prompt = f"""{question}
 
