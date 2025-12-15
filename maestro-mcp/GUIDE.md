@@ -1,4 +1,4 @@
-# Zen Skills MCP - Installation & Usage Guide
+# Maestro MCP - Installation & Usage Guide
 
 ## Table of Contents
 
@@ -46,17 +46,17 @@ gemini --version
 ```bash
 # If part of a repo
 cd your-project
-cp -r path/to/zen-skills-mcp ./zen-skills-mcp
+cp -r path/to/maestro-mcp ./maestro-mcp
 
 # Or clone directly
 git clone <repo-url>
-cd zen-skills-mcp
+cd maestro-mcp
 ```
 
 ### Step 2: Install Dependencies
 
 ```bash
-cd zen-skills-mcp
+cd maestro-mcp
 pip install -r requirements.txt
 ```
 
@@ -72,14 +72,14 @@ nano .env  # or your preferred editor
 
 ### Step 4: Register with Claude Code
 
-Create or update `.mcp.json` in your **project root** (not inside zen-skills-mcp):
+Create or update `.mcp.json` in your **project root** (not inside maestro-mcp):
 
 ```json
 {
   "mcpServers": {
-    "zen-skills-mcp": {
+    "maestro-mcp": {
       "command": "python3",
-      "args": ["zen-skills-mcp/server.py"]
+      "args": ["maestro-mcp/server.py"]
     }
   }
 }
@@ -95,7 +95,7 @@ claude
 /mcp
 
 # Should show:
-# ✓ zen-skills-mcp (running)
+# ✓ maestro-mcp (running)
 ```
 
 ---

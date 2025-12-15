@@ -1,5 +1,8 @@
 """
-Zen Skills MCP - Multi-LLM Orchestration with Measured Coordination
+Maestro MCP - Multi-LLM Orchestration with Measured Coordination
+
+Named "Maestro" because like a conductor orchestrating an orchestra,
+Claude Code coordinates multiple models to produce harmonious output.
 
 Based on two papers:
 1. "Towards a Science of Scaling Agent Systems" (Kim et al., 2025):
@@ -13,11 +16,11 @@ Based on two papers:
    - Red-flagging: Format errors signal reasoning errors
 
 Architecture: Centralized Consult Pattern
-- Claude Code = Orchestrator (tool execution)
+- Claude Code = Maestro/Orchestrator (tool execution)
 - Codex/Gemini/Claude CLI = Consultants (text advice only)
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"  # Renamed to Maestro
 
 from .config import ZenConfig
 from .providers import CodexProvider, GeminiProvider, ClaudeProvider, ProviderRegistry

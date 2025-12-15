@@ -1,6 +1,8 @@
-# Zen Skills MCP
+# Maestro MCP
 
-A Model Context Protocol (MCP) server implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Based on:
+A Model Context Protocol (MCP) server implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Like a maestro conducting an orchestra, Claude Code orchestrates multiple LLM models to produce harmonious, accurate output.
+
+Based on:
 - **"Towards a Science of Scaling Agent Systems"** (Kim et al., 2025)
 - **"Solving a Million-Step LLM Task With Zero Errors"** (MAKER)
 
@@ -30,7 +32,7 @@ This project implements "measured coordination" - using multiple LLMs strategica
                   │ MCP Protocol
                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Zen Skills MCP Server                         │
+│                    Maestro MCP Server                            │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
 │  │   Codex     │  │   Gemini    │  │   Claude    │  Consultants │
 │  │   (Code)    │  │  (Context)  │  │  (Review)   │  (Text only) │
@@ -57,7 +59,7 @@ This project implements "measured coordination" - using multiple LLMs strategica
 ### 1. Install Dependencies
 
 ```bash
-cd zen-skills-mcp
+cd maestro-mcp
 pip install -r requirements.txt
 ```
 
@@ -75,9 +77,9 @@ The `.mcp.json` in the project root is pre-configured:
 ```json
 {
   "mcpServers": {
-    "zen-skills-mcp": {
+    "maestro-mcp": {
       "command": "python3",
-      "args": ["zen-skills-mcp/server.py"]
+      "args": ["maestro-mcp/server.py"]
     }
   }
 }
@@ -87,7 +89,7 @@ Run Claude Code and verify with `/mcp`:
 ```bash
 claude
 # Then type: /mcp
-# Should show zen-skills-mcp as running
+# Should show maestro-mcp as running
 ```
 
 ## Available Tools (34 Total)
@@ -534,7 +536,7 @@ The server tracks metrics from both papers:
 ## Project Structure
 
 ```
-zen-skills-mcp/
+maestro-mcp/
 ├── server.py              # MCP server entry point (34 tools)
 ├── requirements.txt       # Dependencies
 ├── .env.example          # Configuration template

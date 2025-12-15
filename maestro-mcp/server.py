@@ -1,16 +1,22 @@
 """
-Zen Skills MCP Server
+Maestro MCP Server
 
-A Model Context Protocol server implementing:
+A Model Context Protocol server implementing multi-LLM orchestration
+with a "centralized consult" architecture.
+
+Key Features:
 - Multi-LLM orchestration (Claude/Codex/Gemini)
 - 5-stage workflow (Analyze → Hypothesize → Implement → Debug → Improve)
 - Measured coordination based on "Towards a Science of Scaling Agent Systems"
-- Poetiq-style ensemble generation with tests_first selection
-- Role-based persona prompting via cli_clients.yaml
+- MAKER-style error correction (voting, red-flagging, calibration)
+- Dynamic tool loading for context optimization
 
 Architecture: Centralized Consult Pattern
-- Claude Code = Orchestrator (tool execution)
+- Claude Code = Maestro/Orchestrator (tool execution)
 - Codex/Gemini/Claude CLI = Consultants (text advice only)
+
+Named "Maestro" because like a conductor orchestrating an orchestra,
+Claude Code coordinates multiple models to produce harmonious output.
 """
 
 from fastmcp import FastMCP

@@ -1,8 +1,8 @@
-# Zen Skills MCP - Architecture Document
+# Maestro MCP - Architecture Document
 
 ## Overview
 
-Zen Skills MCP is a Model Context Protocol server implementing **measured multi-LLM coordination** for coding workflows. The system orchestrates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules.
+Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM coordination** for coding workflows. Like a conductor orchestrating an orchestra, it coordinates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -12,7 +12,7 @@ Zen Skills MCP is a Model Context Protocol server implementing **measured multi-
                                   │ MCP Protocol
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Zen Skills MCP Server                               │
+│                          Maestro MCP Server                                 │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                    Architecture Selection Engine                      │  │
 │  │  Rule A: Domain-dependent | Rule B: Decompose→MAS, Sequential→SAS   │  │
