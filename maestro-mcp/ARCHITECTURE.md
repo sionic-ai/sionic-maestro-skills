@@ -86,7 +86,7 @@ Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM
 
 ## System Components
 
-### 1. CLI Providers (`zen/providers.py`)
+### 1. CLI Providers (`maestro/providers.py`)
 
 Adapters for external LLM CLIs. Each provider:
 - Wraps a CLI command (codex, gemini, claude)
@@ -111,7 +111,7 @@ class ProviderResponse:
 | Gemini | Large context | Analysis, long files |
 | Claude | Reasoning | Review, synthesis, debugging |
 
-### 2. Architecture Selection Engine (`zen/coordination.py`)
+### 2. Architecture Selection Engine (`maestro/coordination.py`)
 
 Implements the 4 collaboration rules from the Scaling Agent Systems paper.
 
@@ -177,7 +177,7 @@ class MetricsTracker:
         return best_topology if enough_samples else None
 ```
 
-### 3. MAKER Error Correction (`zen/maker.py`)
+### 3. MAKER Error Correction (`maestro/maker.py`)
 
 #### Maximal Agentic Decomposition (MAD)
 
@@ -247,7 +247,7 @@ class RedFlagger:
         return RedFlagResult(is_flagged=len(reasons) > 0)
 ```
 
-### 4. Selection Engine (`zen/selection.py`)
+### 4. Selection Engine (`maestro/selection.py`)
 
 Poetiq-style candidate selection with priority:
 
@@ -273,30 +273,30 @@ class SelectionEngine:
             return max(passed, key=lambda c: lint_score(c))
 ```
 
-### 5. Dynamic Skill Loading (`zen/skills.py`)
+### 5. Dynamic Skill Loading (`maestro/skills.py`)
 
 Minimizes context overhead by loading only needed tools.
 
 ```
 Entry Point              │ Tools Loaded
 ─────────────────────────┼────────────────────────────────────
-zen_enter_stage(analyze) │ zen_pack_context, zen_log_evidence,
-                         │ zen_consult
+maestro_enter_stage(analyze) │ maestro_pack_context, maestro_log_evidence,
+                         │ maestro_consult
                          │
-zen_enter_stage(debug)   │ zen_verify, zen_restore_from_backup,
-                         │ zen_pack_context
+maestro_enter_stage(debug)   │ maestro_verify, maestro_restore_from_backup,
+                         │ maestro_pack_context
                          │
-zen_exit_stage()         │ Core only: zen_list_providers,
-                         │ zen_get_skill, zen_workflow_state
+maestro_exit_stage()         │ Core only: maestro_list_providers,
+                         │ maestro_get_skill, maestro_workflow_state
 ```
 
 Configuration:
 ```bash
-ZEN_MAX_TOOLS=10                    # Maximum exposed tools
-ZEN_DISABLED_TOOLS=zen_run_stage    # Always disable these
+MAESTRO_MAX_TOOLS=10                    # Maximum exposed tools
+MAESTRO_DISABLED_TOOLS=maestro_run_stage    # Always disable these
 ```
 
-### 6. Verification Engine (`zen/verify.py`)
+### 6. Verification Engine (`maestro/verify.py`)
 
 Executes tests, lint, type-checks in sandbox:
 
@@ -316,7 +316,7 @@ class VerificationEngine:
         )
 ```
 
-### 7. Workspace Manager (`zen/workspace.py`)
+### 7. Workspace Manager (`maestro/workspace.py`)
 
 Safe file operations with automatic backup:
 
@@ -452,21 +452,21 @@ for iteration in range(5):
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                     1. Task Classification                                │
-│  zen_classify_task() → TaskStructureFeatures                             │
+│  maestro_classify_task() → TaskStructureFeatures                             │
 │  (decomposability, sequential_dependency, tool_complexity)               │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   2. Architecture Selection                               │
-│  zen_select_architecture() → CoordinationTopology                        │
+│  maestro_select_architecture() → CoordinationTopology                        │
 │  (sas | mas_independent | mas_centralized)                               │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                    3. Dynamic Tool Loading                                │
-│  zen_enter_stage() → Load stage-specific tools                           │
+│  maestro_enter_stage() → Load stage-specific tools                           │
 │  (minimize context overhead)                                              │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
@@ -499,14 +499,14 @@ for iteration in range(5):
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   5. Degradation Check                                    │
-│  zen_check_degradation() → Fallback if needed                            │
+│  maestro_check_degradation() → Fallback if needed                            │
 │  (overhead, error_amplification, redundancy)                             │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   6. Calibration Recording                                │
-│  zen_record_coordination_result() → Update topology stats                │
+│  maestro_record_coordination_result() → Update topology stats                │
 │  (for future architecture selection)                                     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -518,72 +518,72 @@ for iteration in range(5):
 ### Core (4)
 | Tool | Purpose |
 |------|---------|
-| `zen_consult` | Single model consultation |
-| `zen_consult_with_role` | Consultation with persona |
-| `zen_ensemble_generate` | Multi-model candidates |
-| `zen_select_best` | Pick best candidate |
+| `maestro_consult` | Single model consultation |
+| `maestro_consult_with_role` | Consultation with persona |
+| `maestro_ensemble_generate` | Multi-model candidates |
+| `maestro_select_best` | Pick best candidate |
 
 ### Workflow (6)
 | Tool | Purpose |
 |------|---------|
-| `zen_run_stage` | Execute workflow stage |
-| `zen_workflow_state` | Check progress |
-| `zen_get_skill` | Get skill definition |
-| `zen_get_role` | Get persona prompt |
-| `zen_get_schema` | Get output schema |
-| `zen_get_coordination_policy` | Get paper-aligned rules |
+| `maestro_run_stage` | Execute workflow stage |
+| `maestro_workflow_state` | Check progress |
+| `maestro_get_skill` | Get skill definition |
+| `maestro_get_role` | Get persona prompt |
+| `maestro_get_schema` | Get output schema |
+| `maestro_get_coordination_policy` | Get paper-aligned rules |
 
 ### Verification (2)
 | Tool | Purpose |
 |------|---------|
-| `zen_verify` | Run tests/lint/type-check |
-| `zen_validate_content` | Red-flag validation |
+| `maestro_verify` | Run tests/lint/type-check |
+| `maestro_validate_content` | Red-flag validation |
 
 ### Workspace (2)
 | Tool | Purpose |
 |------|---------|
-| `zen_apply_patch` | Apply unified diff safely |
-| `zen_restore_from_backup` | Rollback changes |
+| `maestro_apply_patch` | Apply unified diff safely |
+| `maestro_restore_from_backup` | Rollback changes |
 
 ### Consensus (1)
 | Tool | Purpose |
 |------|---------|
-| `zen_consensus_vote` | First-to-ahead-by-k voting |
+| `maestro_consensus_vote` | First-to-ahead-by-k voting |
 
 ### Evidence (4)
 | Tool | Purpose |
 |------|---------|
-| `zen_log_evidence` | Log to reasoning chain |
-| `zen_get_evidence_chain` | Query evidence |
-| `zen_get_metrics` | Paper-aligned metrics |
-| `zen_pack_context` | Smart context packing |
+| `maestro_log_evidence` | Log to reasoning chain |
+| `maestro_get_evidence_chain` | Query evidence |
+| `maestro_get_metrics` | Paper-aligned metrics |
+| `maestro_pack_context` | Smart context packing |
 
 ### Dynamic Loading (5)
 | Tool | Purpose |
 |------|---------|
-| `zen_enter_stage` | Enter stage + load tools |
-| `zen_enter_skill` | Enter skill + load tools |
-| `zen_exit_stage` | Exit stage + unload |
-| `zen_get_loaded_tools` | Show loaded tools |
-| `zen_recommend_tools` | Recommend tools for task |
+| `maestro_enter_stage` | Enter stage + load tools |
+| `maestro_enter_skill` | Enter skill + load tools |
+| `maestro_exit_stage` | Exit stage + unload |
+| `maestro_get_loaded_tools` | Show loaded tools |
+| `maestro_recommend_tools` | Recommend tools for task |
 
 ### MAKER (4)
 | Tool | Purpose |
 |------|---------|
-| `zen_get_micro_steps` | Get atomic step definitions |
-| `zen_vote_micro_step` | Vote on micro-step |
-| `zen_calibrate` | Calibrate voting k |
-| `zen_red_flag_check` | Check for format errors |
+| `maestro_get_micro_steps` | Get atomic step definitions |
+| `maestro_vote_micro_step` | Vote on micro-step |
+| `maestro_calibrate` | Calibrate voting k |
+| `maestro_red_flag_check` | Check for format errors |
 
 ### Coordination (6)
 | Tool | Purpose |
 |------|---------|
-| `zen_classify_task` | Analyze task structure |
-| `zen_select_architecture` | Choose topology |
-| `zen_check_degradation` | Check for fallback |
-| `zen_record_coordination_result` | Record for calibration |
-| `zen_get_coordination_stats` | View statistics |
-| `zen_get_stage_strategy` | Get stage strategy |
+| `maestro_classify_task` | Analyze task structure |
+| `maestro_select_architecture` | Choose topology |
+| `maestro_check_degradation` | Check for fallback |
+| `maestro_record_coordination_result` | Record for calibration |
+| `maestro_get_coordination_stats` | View statistics |
+| `maestro_get_stage_strategy` | Get stage strategy |
 
 **Total: 34 tools**
 
@@ -595,34 +595,34 @@ for iteration in range(5):
 
 ```bash
 # Provider configuration
-ZEN_CODEX_CMD=codex
-ZEN_CODEX_MODEL=gpt-5.2-xhigh
-ZEN_CODEX_TIMEOUT=900
+MAESTRO_CODEX_CMD=codex
+MAESTRO_CODEX_MODEL=gpt-5.2-xhigh
+MAESTRO_CODEX_TIMEOUT=900
 
-ZEN_GEMINI_CMD=gemini
-ZEN_GEMINI_MODEL=gemini-3-pro-preview
-ZEN_GEMINI_TIMEOUT=600
+MAESTRO_GEMINI_CMD=gemini
+MAESTRO_GEMINI_MODEL=gemini-3-pro-preview
+MAESTRO_GEMINI_TIMEOUT=600
 
-ZEN_CLAUDE_CMD=claude
-ZEN_CLAUDE_MODEL=opus
-ZEN_CLAUDE_TIMEOUT=600
+MAESTRO_CLAUDE_CMD=claude
+MAESTRO_CLAUDE_MODEL=opus
+MAESTRO_CLAUDE_TIMEOUT=600
 
 # Coordination policy
-ZEN_CAPABILITY_THRESHOLD=0.45    # Skip ensemble above this
-ZEN_MAX_CONSULT_PER_STAGE=2
-ZEN_MAX_CONSULT_TOTAL=6
+MAESTRO_CAPABILITY_THRESHOLD=0.45    # Skip ensemble above this
+MAESTRO_MAX_CONSULT_PER_STAGE=2
+MAESTRO_MAX_CONSULT_TOTAL=6
 
 # Dynamic tool loading
-ZEN_MAX_TOOLS=10                 # Maximum tools at once
-ZEN_DISABLED_TOOLS=zen_run_stage # Comma-separated
+MAESTRO_MAX_TOOLS=10                 # Maximum tools at once
+MAESTRO_DISABLED_TOOLS=maestro_run_stage # Comma-separated
 
 # Context packing
-ZEN_CONTEXT_MAX_FILES=7
-ZEN_CONTEXT_MAX_CHARS=40000
+MAESTRO_CONTEXT_MAX_FILES=7
+MAESTRO_CONTEXT_MAX_CHARS=40000
 
 # Tracing
-ZEN_TRACE_DIR=.zen-traces
-ZEN_LOG_LEVEL=INFO
+MAESTRO_TRACE_DIR=.maestro-traces
+MAESTRO_LOG_LEVEL=INFO
 ```
 
 ### Skill Manifest (`conf/skill_manifest.yaml`)
@@ -630,7 +630,7 @@ ZEN_LOG_LEVEL=INFO
 ```yaml
 # Tool definitions with context costs
 tools:
-  - name: zen_consult
+  - name: maestro_consult
     context_cost: 200
     category: consultation
 
@@ -639,8 +639,8 @@ skills:
   - name: root_cause_analysis
     stage: hypothesize
     required_tools:
-      - zen_consult
-      - zen_log_evidence
+      - maestro_consult
+      - maestro_log_evidence
     micro_steps:
       - h1_root_cause
 

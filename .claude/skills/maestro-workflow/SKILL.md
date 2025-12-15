@@ -1,5 +1,5 @@
 ---
-name: zen-workflow
+name: maestro-workflow
 description: >
   Multi-LLM orchestration implementing the 5-stage coding workflow:
   Example Analysis → Hypothesis → Implementation → Debug Loop → Recursive Improvement.
@@ -13,7 +13,7 @@ description: >
   or any task that benefits from diverse LLM perspectives with verification.
 ---
 
-# Zen Workflow: Multi-LLM Orchestration with Measured Coordination
+# Maestro Workflow: Multi-LLM Orchestration with Measured Coordination
 
 ## Core Philosophy (Paper-Based)
 
@@ -32,19 +32,19 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 ### 3. Error Amplification Prevention
 - **Paper finding**: Independent agents amplify errors 17.2x without verification
 - **Our rule**: ALWAYS verify with tests before accepting any candidate
-- **Use `zen_select_best` with `tests_first` mode (not voting!)**
+- **Use `maestro_select_best` with `tests_first` mode (not voting!)**
 
 ## Available Tools
 
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
-| `zen_consult` | Single model consultation | Analysis, code review, specific questions |
-| `zen_ensemble_generate` | Multiple candidates | Hypothesis generation, solution exploration |
-| `zen_select_best` | Pick best candidate | After ensemble, with test/lint results |
-| `zen_pack_context` | Smart context packing | Before any consultation |
-| `zen_run_stage` | Execute workflow stage | Structured 5-stage execution |
-| `zen_workflow_state` | Check progress | Monitor budget, see history |
-| `zen_get_metrics` | Paper-aligned metrics | Performance analysis |
+| `maestro_consult` | Single model consultation | Analysis, code review, specific questions |
+| `maestro_ensemble_generate` | Multiple candidates | Hypothesis generation, solution exploration |
+| `maestro_select_best` | Pick best candidate | After ensemble, with test/lint results |
+| `maestro_pack_context` | Smart context packing | Before any consultation |
+| `maestro_run_stage` | Execute workflow stage | Structured 5-stage execution |
+| `maestro_workflow_state` | Check progress | Monitor budget, see history |
+| `maestro_get_metrics` | Paper-aligned metrics | Performance analysis |
 
 ## The 5-Stage Workflow
 
@@ -53,7 +53,7 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 
 **Process**:
 1. Gather context with file reads, `grep`, `ls`
-2. Optionally use `zen_consult(provider="gemini")` for large file summarization
+2. Optionally use `maestro_consult(provider="gemini")` for large file summarization
 3. Document observations, repro steps, affected modules
 
 **Output** (JSON):
@@ -74,9 +74,9 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 **Goal**: Generate competing explanations with testable predictions.
 
 **Process**:
-1. Use `zen_ensemble_generate(task="Top 3 root causes...", providers=["codex", "gemini"])`
+1. Use `maestro_ensemble_generate(task="Top 3 root causes...", providers=["codex", "gemini"])`
 2. Each hypothesis must have a VERIFICATION TEST
-3. Use `zen_select_best` to pick most testable hypothesis
+3. Use `maestro_select_best` to pick most testable hypothesis
 
 **Output** (JSON):
 ```json
@@ -103,7 +103,7 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 
 **Process**:
 1. Claude Code (orchestrator) edits the file directly
-2. Optionally consult `zen_consult(provider="codex")` for diff suggestions
+2. Optionally consult `maestro_consult(provider="codex")` for diff suggestions
 3. Run tests IMMEDIATELY after edit
 
 **Key Rules**:
@@ -142,7 +142,7 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 1. Review for code quality (but don't over-engineer!)
 2. Identify edge cases
 3. Add regression tests
-4. Optional: `zen_consult(provider="claude")` for safety review
+4. Optional: `maestro_consult(provider="claude")` for safety review
 
 **Entry Condition**: ALL TESTS MUST PASS
 
@@ -157,13 +157,13 @@ This workflow implements findings from "Towards a Science of Scaling Agent Syste
 User: "The login test is failing, can you debug it?"
 
 1. [ANALYZE] Read test file, error logs
-   zen_pack_context(files=["tests/test_auth.py"], errors=[error_log], stage="analyze")
+   maestro_pack_context(files=["tests/test_auth.py"], errors=[error_log], stage="analyze")
 
 2. [HYPOTHESIZE] Generate root cause theories
-   zen_ensemble_generate(task="Top 3 causes for IndexError in auth...", providers=["codex", "gemini"])
+   maestro_ensemble_generate(task="Top 3 causes for IndexError in auth...", providers=["codex", "gemini"])
 
 3. [SELECT] Pick most testable hypothesis
-   zen_select_best(candidates=..., mode="tests_first", test_results=[...])
+   maestro_select_best(candidates=..., mode="tests_first", test_results=[...])
 
 4. [IMPLEMENT] Fix (Claude edits directly)
    Edit file, run pytest
@@ -179,21 +179,21 @@ User: "The login test is failing, can you debug it?"
 ```
 User: "Review this PR for security issues"
 
-1. zen_pack_context(files=[changed_files], stage="analyze")
+1. maestro_pack_context(files=[changed_files], stage="analyze")
 
-2. zen_ensemble_generate(
+2. maestro_ensemble_generate(
      task="Security review: identify vulnerabilities in...",
      providers=["codex", "gemini", "claude"]
    )
 
-3. zen_select_best(candidates=..., mode="llm_judge", criteria=["security", "severity"])
+3. maestro_select_best(candidates=..., mode="llm_judge", criteria=["security", "severity"])
 ```
 
 ### Pattern 3: Checking Metrics Mid-Workflow
 ```
 User: "How much coordination overhead have we used?"
 
-zen_workflow_state()
+maestro_workflow_state()
 # Returns: consults used, budget remaining, efficiency score
 ```
 
@@ -221,7 +221,7 @@ If a sub-agent fails:
 
 After any workflow, check:
 ```
-zen_get_metrics()
+maestro_get_metrics()
 ```
 
 Key metrics:

@@ -34,21 +34,21 @@ try:
 except ImportError:
     YAML_AVAILABLE = False
 
-from zen.config import ZenConfig
-from zen.providers import ProviderRegistry, ProviderResponse
-from zen.context import ContextPacker, PackingConfig
-from zen.workflow import WorkflowEngine, Stage, StageContext, WorkflowRunner
-from zen.selection import (
+from maestro.config import MaestroConfig
+from maestro.providers import ProviderRegistry, ProviderResponse
+from maestro.context import ContextPacker, PackingConfig
+from maestro.workflow import WorkflowEngine, Stage, StageContext, WorkflowRunner
+from maestro.selection import (
     SelectionEngine, SelectionMode, Candidate, TestSignal, LintSignal,
     RedFlagConfig, validate_candidate_content, RedFlagResult
 )
-from zen.tracing import TraceStore, Metrics, EvidenceType
-from zen.verify import VerificationEngine, VerificationType, VerificationResult
-from zen.workspace import WorkspaceManager, WorkspaceConfig, PatchResult
-from zen.consensus import ConsensusEngine, ConsensusConfig, RedFlagConfig as ConsensusRedFlagConfig
+from maestro.tracing import TraceStore, Metrics, EvidenceType
+from maestro.verify import VerificationEngine, VerificationType, VerificationResult
+from maestro.workspace import WorkspaceManager, WorkspaceConfig, PatchResult
+from maestro.consensus import ConsensusEngine, ConsensusConfig, RedFlagConfig as ConsensusRedFlagConfig
 
 # MAKER-style modules
-from zen.maker import (
+from maestro.maker import (
     StageType, MicroStepType, MicroStepSpec, MICRO_STEP_SPECS,
     RedFlagger, RedFlaggerConfig, RedFlagResult as MakerRedFlagResult,
     VoteStep, VoteResult, VoteCandidate,
@@ -56,11 +56,11 @@ from zen.maker import (
     get_tools_for_step, get_tools_for_stage, get_all_micro_steps_for_stage,
     get_default_k_for_step, step_has_oracle,
 )
-from zen.skills import (
+from maestro.skills import (
     SkillManifest, SkillDefinition, DynamicToolRegistry, ToolLoadState,
     SkillSession, SkillLoader, create_skill_session, get_recommended_tools_for_task,
 )
-from zen.coordination import (
+from maestro.coordination import (
     CoordinationTopology, TaskStructureFeatures, CoordinationDecision,
     CoordinationMetrics, MetricsTracker, ArchitectureSelectionEngine,
     TaskStructureClassifier, DegradationStrategy, CoordinationPolicy,
@@ -142,13 +142,13 @@ CLI_CONFIG = load_yaml_config(BASE_DIR / "conf" / "cli_clients.yaml")
 
 # Configure logging
 logging.basicConfig(
-    level=os.getenv("ZEN_LOG_LEVEL", "INFO"),
+    level=os.getenv("MAESTRO_LOG_LEVEL", "INFO"),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger("zen.server")
+logger = logging.getLogger("maestro.server")
 
 # Initialize configuration
-config = ZenConfig.from_env()
+config = MaestroConfig.from_env()
 
 # Initialize MCP server
 mcp = FastMCP(
@@ -171,10 +171,10 @@ trace_store = TraceStore(
 
 # Initialize MAKER/Skill components
 skill_manifest = SkillManifest(str(BASE_DIR / "conf" / "skill_manifest.yaml"))
-disabled_tools = set(os.getenv("ZEN_DISABLED_TOOLS", "").split(",")) if os.getenv("ZEN_DISABLED_TOOLS") else set()
+disabled_tools = set(os.getenv("MAESTRO_DISABLED_TOOLS", "").split(",")) if os.getenv("MAESTRO_DISABLED_TOOLS") else set()
 tool_registry = DynamicToolRegistry(
     manifest=skill_manifest,
-    max_tools=int(os.getenv("ZEN_MAX_TOOLS", "10")),
+    max_tools=int(os.getenv("MAESTRO_MAX_TOOLS", "10")),
     disabled_tools=disabled_tools,
 )
 skill_session = SkillSession(skill_manifest, tool_registry)
@@ -194,11 +194,11 @@ degradation_strategy = DegradationStrategy()
 
 
 # ============================================================================
-# TOOL: zen_consult - Single provider consultation
+# TOOL: maestro_consult - Single provider consultation
 # ============================================================================
 
 @mcp.tool()
-def zen_consult(
+def maestro_consult(
     prompt: str,
     provider: Literal["codex", "gemini", "claude"] = "codex",
     model: Optional[str] = None,
@@ -303,11 +303,11 @@ def zen_consult(
 
 
 # ============================================================================
-# TOOL: zen_ensemble_generate - Multi-provider candidate generation
+# TOOL: maestro_ensemble_generate - Multi-provider candidate generation
 # ============================================================================
 
 @mcp.tool()
-def zen_ensemble_generate(
+def maestro_ensemble_generate(
     task: str,
     providers: Optional[List[str]] = None,
     context_files: Optional[List[str]] = None,
@@ -432,11 +432,11 @@ def zen_ensemble_generate(
 
 
 # ============================================================================
-# TOOL: zen_select_best - Select best candidate
+# TOOL: maestro_select_best - Select best candidate
 # ============================================================================
 
 @mcp.tool()
-def zen_select_best(
+def maestro_select_best(
     candidates: List[Dict[str, Any]],
     mode: Literal["tests_first", "llm_judge", "hybrid"] = "tests_first",
     test_results: Optional[List[Dict[str, Any]]] = None,
@@ -457,7 +457,7 @@ def zen_select_best(
     4. Provider trust scores
 
     Args:
-        candidates: List of candidates from zen_ensemble_generate.
+        candidates: List of candidates from maestro_ensemble_generate.
         mode: Selection strategy ('tests_first', 'llm_judge', 'hybrid').
         test_results: Optional test results [{candidate_id, passed, output}].
         lint_results: Optional lint results [{candidate_id, score, output}].
@@ -551,11 +551,11 @@ def zen_select_best(
 
 
 # ============================================================================
-# TOOL: zen_pack_context - Context engineering utility
+# TOOL: maestro_pack_context - Context engineering utility
 # ============================================================================
 
 @mcp.tool()
-def zen_pack_context(
+def maestro_pack_context(
     files: Optional[List[str]] = None,
     facts: Optional[List[str]] = None,
     errors: Optional[List[str]] = None,
@@ -619,11 +619,11 @@ def zen_pack_context(
 
 
 # ============================================================================
-# TOOL: zen_workflow_state - Get current workflow state
+# TOOL: maestro_workflow_state - Get current workflow state
 # ============================================================================
 
 @mcp.tool()
-def zen_workflow_state() -> Dict[str, Any]:
+def maestro_workflow_state() -> Dict[str, Any]:
     """
     Get the current workflow state and metrics.
 
@@ -648,11 +648,11 @@ def zen_workflow_state() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_run_stage - Execute a workflow stage
+# TOOL: maestro_run_stage - Execute a workflow stage
 # ============================================================================
 
 @mcp.tool()
-def zen_run_stage(
+def maestro_run_stage(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
     task: str,
     context_files: Optional[List[str]] = None,
@@ -754,11 +754,11 @@ def zen_run_stage(
 
 
 # ============================================================================
-# TOOL: zen_get_metrics - Get detailed metrics
+# TOOL: maestro_get_metrics - Get detailed metrics
 # ============================================================================
 
 @mcp.tool()
-def zen_get_metrics() -> Dict[str, Any]:
+def maestro_get_metrics() -> Dict[str, Any]:
     """
     Get detailed metrics aligned with the paper.
 
@@ -784,11 +784,11 @@ def zen_get_metrics() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_list_providers - List available providers
+# TOOL: maestro_list_providers - List available providers
 # ============================================================================
 
 @mcp.tool()
-def zen_list_providers() -> Dict[str, Any]:
+def maestro_list_providers() -> Dict[str, Any]:
     """
     List available CLI providers and their status.
 
@@ -814,11 +814,11 @@ def zen_list_providers() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_get_skill - Get skill definition for a stage
+# TOOL: maestro_get_skill - Get skill definition for a stage
 # ============================================================================
 
 @mcp.tool()
-def zen_get_skill(
+def maestro_get_skill(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
     """
@@ -874,11 +874,11 @@ def zen_get_skill(
 
 
 # ============================================================================
-# TOOL: zen_get_role - Get role/persona prompt
+# TOOL: maestro_get_role - Get role/persona prompt
 # ============================================================================
 
 @mcp.tool()
-def zen_get_role(
+def maestro_get_role(
     role: Literal[
         "example_analyst",
         "hypothesis_scientist",
@@ -927,11 +927,11 @@ def zen_get_role(
 
 
 # ============================================================================
-# TOOL: zen_get_schema - Get output schema for validation
+# TOOL: maestro_get_schema - Get output schema for validation
 # ============================================================================
 
 @mcp.tool()
-def zen_get_schema(
+def maestro_get_schema(
     schema: Literal[
         "stage1_output",
         "stage2_output",
@@ -975,11 +975,11 @@ def zen_get_schema(
 
 
 # ============================================================================
-# TOOL: zen_consult_with_role - Consult with role-based prompting
+# TOOL: maestro_consult_with_role - Consult with role-based prompting
 # ============================================================================
 
 @mcp.tool()
-def zen_consult_with_role(
+def maestro_consult_with_role(
     prompt: str,
     role: Literal[
         "example_analyst",
@@ -999,7 +999,7 @@ def zen_consult_with_role(
     """
     Consult an LLM with a specific role/persona system prompt.
 
-    This combines zen_consult with role-based prompting from cli_clients.yaml.
+    This combines maestro_consult with role-based prompting from cli_clients.yaml.
     The role's system prompt is prepended to shape the LLM's response style.
 
     Roles and their purposes:
@@ -1097,11 +1097,11 @@ def zen_consult_with_role(
 
 
 # ============================================================================
-# TOOL: zen_get_coordination_policy - Get paper-aligned coordination rules
+# TOOL: maestro_get_coordination_policy - Get paper-aligned coordination rules
 # ============================================================================
 
 @mcp.tool()
-def zen_get_coordination_policy() -> Dict[str, Any]:
+def maestro_get_coordination_policy() -> Dict[str, Any]:
     """
     Get the coordination policies based on the paper.
 
@@ -1147,11 +1147,11 @@ def zen_get_coordination_policy() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_verify - Run verification (tests/lint/type-check)
+# TOOL: maestro_verify - Run verification (tests/lint/type-check)
 # ============================================================================
 
 @mcp.tool()
-def zen_verify(
+def maestro_verify(
     commands: List[Dict[str, Any]],
     cwd: Optional[str] = None,
     stop_on_failure: bool = False,
@@ -1177,7 +1177,7 @@ def zen_verify(
         VerificationReport with pass/fail status for each command.
 
     Example:
-        zen_verify([
+        maestro_verify([
             {"command": "python -m pytest tests/ -v", "type": "unit_test"},
             {"command": "python -m ruff check src/", "type": "lint"}
         ])
@@ -1216,11 +1216,11 @@ def zen_verify(
 
 
 # ============================================================================
-# TOOL: zen_apply_patch - Apply a unified diff patch safely
+# TOOL: maestro_apply_patch - Apply a unified diff patch safely
 # ============================================================================
 
 @mcp.tool()
-def zen_apply_patch(
+def maestro_apply_patch(
     patch: str,
     workspace_root: Optional[str] = None,
     dry_run: bool = False,
@@ -1245,7 +1245,7 @@ def zen_apply_patch(
         PatchResult with files changed, created, failed, and backup location.
 
     Example:
-        zen_apply_patch('''
+        maestro_apply_patch('''
         --- a/src/main.py
         +++ b/src/main.py
         @@ -10,6 +10,7 @@
@@ -1281,11 +1281,11 @@ def zen_apply_patch(
 
 
 # ============================================================================
-# TOOL: zen_consensus_vote - MAKER-style micro-decision voting
+# TOOL: maestro_consensus_vote - MAKER-style micro-decision voting
 # ============================================================================
 
 @mcp.tool()
-def zen_consensus_vote(
+def maestro_consensus_vote(
     question: str,
     k: int = 3,
     max_rounds: int = 12,
@@ -1368,11 +1368,11 @@ def zen_consensus_vote(
 
 
 # ============================================================================
-# TOOL: zen_validate_content - Red-flag validation for any content
+# TOOL: maestro_validate_content - Red-flag validation for any content
 # ============================================================================
 
 @mcp.tool()
-def zen_validate_content(
+def maestro_validate_content(
     content: str,
     content_type: Literal["general", "diff", "json"] = "general",
     max_chars: int = 15000,
@@ -1432,11 +1432,11 @@ def zen_validate_content(
 
 
 # ============================================================================
-# TOOL: zen_log_evidence - Log evidence to the chain
+# TOOL: maestro_log_evidence - Log evidence to the chain
 # ============================================================================
 
 @mcp.tool()
-def zen_log_evidence(
+def maestro_log_evidence(
     evidence_type: Literal["observation", "hypothesis", "decision", "verification"],
     stage: str,
     content: Dict[str, Any],
@@ -1495,11 +1495,11 @@ def zen_log_evidence(
 
 
 # ============================================================================
-# TOOL: zen_get_evidence_chain - Query the evidence chain
+# TOOL: maestro_get_evidence_chain - Query the evidence chain
 # ============================================================================
 
 @mcp.tool()
-def zen_get_evidence_chain(
+def maestro_get_evidence_chain(
     evidence_type: Optional[str] = None,
     stage: Optional[str] = None,
     limit: int = 50,
@@ -1546,11 +1546,11 @@ def zen_get_evidence_chain(
 
 
 # ============================================================================
-# TOOL: zen_restore_from_backup - Restore files from backup
+# TOOL: maestro_restore_from_backup - Restore files from backup
 # ============================================================================
 
 @mcp.tool()
-def zen_restore_from_backup(
+def maestro_restore_from_backup(
     backup_session: str,
     workspace_root: Optional[str] = None,
     files: Optional[List[str]] = None,
@@ -1561,7 +1561,7 @@ def zen_restore_from_backup(
     Use when a patch introduced bugs and you need to rollback.
 
     Args:
-        backup_session: The backup session ID (from zen_apply_patch result).
+        backup_session: The backup session ID (from maestro_apply_patch result).
         workspace_root: Root directory for restoration.
         files: Optional list of specific files to restore.
 
@@ -1576,7 +1576,7 @@ def zen_restore_from_backup(
     if success:
         trace_store.log_rollback(
             files_restored=restored,
-            reason="Manual rollback via zen_restore_from_backup",
+            reason="Manual rollback via maestro_restore_from_backup",
             stage="debug",
         )
 
@@ -1589,11 +1589,11 @@ def zen_restore_from_backup(
 
 
 # ============================================================================
-# TOOL: zen_enter_stage - Enter a workflow stage (dynamic tool loading)
+# TOOL: maestro_enter_stage - Enter a workflow stage (dynamic tool loading)
 # ============================================================================
 
 @mcp.tool()
-def zen_enter_stage(
+def maestro_enter_stage(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
     """
@@ -1641,11 +1641,11 @@ def zen_enter_stage(
 
 
 # ============================================================================
-# TOOL: zen_enter_skill - Enter a specific skill (fine-grained tool loading)
+# TOOL: maestro_enter_skill - Enter a specific skill (fine-grained tool loading)
 # ============================================================================
 
 @mcp.tool()
-def zen_enter_skill(
+def maestro_enter_skill(
     skill_name: str,
 ) -> Dict[str, Any]:
     """
@@ -1691,11 +1691,11 @@ def zen_enter_skill(
 
 
 # ============================================================================
-# TOOL: zen_get_micro_steps - Get micro-steps for current stage/skill
+# TOOL: maestro_get_micro_steps - Get micro-steps for current stage/skill
 # ============================================================================
 
 @mcp.tool()
-def zen_get_micro_steps(
+def maestro_get_micro_steps(
     stage: Optional[Literal["analyze", "hypothesize", "implement", "debug", "improve"]] = None,
 ) -> Dict[str, Any]:
     """
@@ -1759,11 +1759,11 @@ def zen_get_micro_steps(
 
 
 # ============================================================================
-# TOOL: zen_vote_micro_step - MAKER-style voting on a micro-step
+# TOOL: maestro_vote_micro_step - MAKER-style voting on a micro-step
 # ============================================================================
 
 @mcp.tool()
-def zen_vote_micro_step(
+def maestro_vote_micro_step(
     step_type: Literal[
         "s1_spec_extract", "s2_edge_case", "s3_mre",
         "h1_root_cause", "h2_verification",
@@ -1854,7 +1854,7 @@ def zen_vote_micro_step(
             "total_rounds": result.total_rounds,
             "vote_distribution": dict(result.vote_distribution),
         },
-        source="zen_vote_micro_step",
+        source="maestro_vote_micro_step",
         confidence=result.final_margin / max(result.total_samples, 1) if result.winner else 0,
         links=[],
     )
@@ -1876,11 +1876,11 @@ def zen_vote_micro_step(
 
 
 # ============================================================================
-# TOOL: zen_calibrate - Calibrate voting parameters
+# TOOL: maestro_calibrate - Calibrate voting parameters
 # ============================================================================
 
 @mcp.tool()
-def zen_calibrate(
+def maestro_calibrate(
     step_type: Literal[
         "s1_spec_extract", "s2_edge_case", "s3_mre",
         "h1_root_cause", "h2_verification",
@@ -1978,11 +1978,11 @@ def zen_calibrate(
 
 
 # ============================================================================
-# TOOL: zen_red_flag_check - Check content for red flags
+# TOOL: maestro_red_flag_check - Check content for red flags
 # ============================================================================
 
 @mcp.tool()
-def zen_red_flag_check(
+def maestro_red_flag_check(
     content: str,
     step_type: Optional[Literal[
         "s1_spec_extract", "s2_edge_case", "s3_mre",
@@ -2039,11 +2039,11 @@ def zen_red_flag_check(
 
 
 # ============================================================================
-# TOOL: zen_get_loaded_tools - Get currently loaded tools
+# TOOL: maestro_get_loaded_tools - Get currently loaded tools
 # ============================================================================
 
 @mcp.tool()
-def zen_get_loaded_tools() -> Dict[str, Any]:
+def maestro_get_loaded_tools() -> Dict[str, Any]:
     """
     Get the list of currently loaded tools.
 
@@ -2067,11 +2067,11 @@ def zen_get_loaded_tools() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_recommend_tools - Get recommended tools for a task
+# TOOL: maestro_recommend_tools - Get recommended tools for a task
 # ============================================================================
 
 @mcp.tool()
-def zen_recommend_tools(
+def maestro_recommend_tools(
     task_description: str,
 ) -> Dict[str, Any]:
     """
@@ -2106,21 +2106,21 @@ def zen_recommend_tools(
         "recommended_tools": recommended,
         "suggested_stage": suggested_stage,
         "tool_count": len(recommended),
-        "hint": f"Use zen_enter_stage('{suggested_stage}') to load these tools",
+        "hint": f"Use maestro_enter_stage('{suggested_stage}') to load these tools",
     }
 
 
 # ============================================================================
-# TOOL: zen_exit_stage - Exit current stage and unload tools
+# TOOL: maestro_exit_stage - Exit current stage and unload tools
 # ============================================================================
 
 @mcp.tool()
-def zen_exit_stage() -> Dict[str, Any]:
+def maestro_exit_stage() -> Dict[str, Any]:
     """
     Exit current stage and unload non-core tools.
 
     Call this when transitioning between stages to minimize context.
-    Only core tools (zen_list_providers, zen_get_skill, zen_workflow_state)
+    Only core tools (maestro_list_providers, maestro_get_skill, maestro_workflow_state)
     remain loaded.
 
     Returns:
@@ -2138,11 +2138,11 @@ def zen_exit_stage() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_classify_task - Analyze task structure for architecture selection
+# TOOL: maestro_classify_task - Analyze task structure for architecture selection
 # ============================================================================
 
 @mcp.tool()
-def zen_classify_task(
+def maestro_classify_task(
     task_description: str,
     code_context: Optional[str] = None,
     error_logs: Optional[str] = None,
@@ -2201,11 +2201,11 @@ def zen_classify_task(
 
 
 # ============================================================================
-# TOOL: zen_select_architecture - Select coordination topology for a stage
+# TOOL: maestro_select_architecture - Select coordination topology for a stage
 # ============================================================================
 
 @mcp.tool()
-def zen_select_architecture(
+def maestro_select_architecture(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
     decomposability_score: float = 0.5,
     sequential_dependency_score: float = 0.5,
@@ -2283,11 +2283,11 @@ def zen_select_architecture(
 
 
 # ============================================================================
-# TOOL: zen_check_degradation - Check if should fall back to simpler topology
+# TOOL: maestro_check_degradation - Check if should fall back to simpler topology
 # ============================================================================
 
 @mcp.tool()
-def zen_check_degradation(
+def maestro_check_degradation(
     current_topology: Literal["sas", "mas_independent", "mas_centralized"],
     total_messages: int = 0,
     total_rounds: int = 0,
@@ -2380,11 +2380,11 @@ def zen_check_degradation(
 
 
 # ============================================================================
-# TOOL: zen_record_coordination_result - Record result for calibration
+# TOOL: maestro_record_coordination_result - Record result for calibration
 # ============================================================================
 
 @mcp.tool()
-def zen_record_coordination_result(
+def maestro_record_coordination_result(
     topology: Literal["sas", "mas_independent", "mas_centralized"],
     success: bool,
     tokens_used: int = 0,
@@ -2473,11 +2473,11 @@ def zen_record_coordination_result(
 
 
 # ============================================================================
-# TOOL: zen_get_coordination_stats - Get calibration statistics
+# TOOL: maestro_get_coordination_stats - Get calibration statistics
 # ============================================================================
 
 @mcp.tool()
-def zen_get_coordination_stats() -> Dict[str, Any]:
+def maestro_get_coordination_stats() -> Dict[str, Any]:
     """
     Get coordination calibration statistics.
 
@@ -2529,11 +2529,11 @@ def zen_get_coordination_stats() -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL: zen_get_stage_strategy - Get recommended strategy for a stage
+# TOOL: maestro_get_stage_strategy - Get recommended strategy for a stage
 # ============================================================================
 
 @mcp.tool()
-def zen_get_stage_strategy(
+def maestro_get_stage_strategy(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
     """

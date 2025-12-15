@@ -1,4 +1,4 @@
-# Critical Analysis: sionic-mcp vs zen-skills-mcp (maestro-mcp)
+# Critical Analysis: sionic-mcp vs maestro-mcp (maestro-mcp)
 
 ## Executive Summary
 
@@ -27,13 +27,13 @@ External configs:
 └── policies/*.md      (collaboration rules)
 ```
 
-### zen-skills-mcp (maestro-mcp)
+### maestro-mcp (maestro-mcp)
 ```
-zen-skills-mcp/
+maestro-mcp/
 ├── server.py          (tool registration)
-└── zen/
+└── maestro/
     ├── __init__.py
-    ├── config.py      (ZenConfig)
+    ├── config.py      (MaestroConfig)
     ├── providers.py   (CodexProvider, GeminiProvider, ClaudeProvider)
     ├── context.py     (ContextPacker)
     ├── workflow.py    (WorkflowEngine)
@@ -68,7 +68,7 @@ def _call_provider(*, provider, model, prompt, ...):
     # Clean, readable, debuggable
 ```
 
-vs zen-skills-mcp:
+vs maestro-mcp:
 ```python
 # Spread across multiple classes
 class CodexProvider(BaseProvider):
@@ -94,7 +94,7 @@ claude_output_format_flag: str | None # --output-format
 claude_json_schema_flag: str | None  # --json-schema
 ```
 
-zen-skills-mcp lacks this granularity.
+maestro-mcp lacks this granularity.
 
 ### 3. Secret Masking ✅
 
@@ -109,7 +109,7 @@ def _mask_text(cfg, text):
         out = pattern.sub(cfg.mask_replacement, out)
 ```
 
-**zen-skills-mcp is missing this entirely** — a security oversight.
+**maestro-mcp is missing this entirely** — a security oversight.
 
 ### 4. JSON Schema Validation ✅
 
@@ -122,7 +122,7 @@ def _schema_validate(schema, value):
     Draft202012Validator(schema).validate(value)
 ```
 
-zen-skills-mcp has basic field checking but no proper JSON Schema validation.
+maestro-mcp has basic field checking but no proper JSON Schema validation.
 
 ### 5. Complete Stage Schemas ✅
 
@@ -157,20 +157,20 @@ def _git_state(cwd):
     state["diff_stat"] = _run_git(["diff", "--stat"])
 ```
 
-zen-skills-mcp lacks this — important for debugging/audit.
+maestro-mcp lacks this — important for debugging/audit.
 
 ### 7. Artifact System ✅
 
 sionic-mcp saves run artifacts:
 
 ```python
-artifact_dir: Path  # .zenloop/artifacts
+artifact_dir: Path  # .maestroloop/artifacts
 artifact_enabled: bool
 
 # Saves stage results, policy decisions, recommendations
 ```
 
-zen-skills-mcp only has trace logging, no structured artifacts.
+maestro-mcp only has trace logging, no structured artifacts.
 
 ### 8. Tool Profile Implementation ✅
 
@@ -179,7 +179,7 @@ sionic-mcp's tool profiles are cleaner:
 ```python
 # Explicit profile definitions
 profiles = {
-    "bootstrap": {"skills.get", "clink.run", "zen.stage.run", ...},
+    "bootstrap": {"skills.get", "clink.run", "maestro.stage.run", ...},
     "analysis": {"repo.read_file", "candidates.generate", ...},
     "implementation": {"repo.apply_patch", "verify.run", ...},
 }
@@ -189,15 +189,15 @@ profiles = {
 
 sionic-mcp has `tests/test_app_helpers.py` with actual tests.
 
-zen-skills-mcp has **no tests** — unacceptable for production code.
+maestro-mcp has **no tests** — unacceptable for production code.
 
 ---
 
-## Where zen-skills-mcp (maestro-mcp) is Better
+## Where maestro-mcp (maestro-mcp) is Better
 
 ### 1. Faithful MAKER Implementation ✅
 
-zen-skills-mcp has explicit MAKER paper concepts:
+maestro-mcp has explicit MAKER paper concepts:
 
 ```python
 class MicroStepType(Enum):
@@ -223,7 +223,7 @@ sionic-mcp only has 5 stages, not the finer MAD (Maximal Agentic Decomposition).
 
 ### 2. Calibration System ✅
 
-zen-skills-mcp implements p/k calibration from MAKER:
+maestro-mcp implements p/k calibration from MAKER:
 
 ```python
 class Calibrator:
@@ -245,7 +245,7 @@ sionic-mcp **hardcodes k** without calibration.
 
 ### 3. Comprehensive RedFlagger ✅
 
-zen-skills-mcp has richer red-flag validation:
+maestro-mcp has richer red-flag validation:
 
 ```python
 class RedFlagger:
@@ -267,7 +267,7 @@ sionic-mcp's red-flagging is simpler (truncation, regex match/missing).
 
 ### 4. Architecture Selection Engine ✅
 
-zen-skills-mcp has a complete implementation of Rules A-D:
+maestro-mcp has a complete implementation of Rules A-D:
 
 ```python
 class ArchitectureSelectionEngine:
@@ -290,7 +290,7 @@ sionic-mcp's `policy_recommend_topology` is simpler (single function).
 
 ### 5. Metrics Tracking ✅
 
-zen-skills-mcp has rolling metrics:
+maestro-mcp has rolling metrics:
 
 ```python
 class MetricsTracker:
@@ -305,7 +305,7 @@ class MetricsTracker:
 
 ### 6. Degradation Strategy ✅
 
-zen-skills-mcp has automatic fallback:
+maestro-mcp has automatic fallback:
 
 ```python
 class DegradationStrategy:
@@ -326,7 +326,7 @@ sionic-mcp lacks this.
 
 ### 7. VoteStep with Equivalence ✅
 
-zen-skills-mcp's voting supports custom equivalence:
+maestro-mcp's voting supports custom equivalence:
 
 ```python
 class VoteStep:
@@ -359,7 +359,7 @@ Can't learn from historical runs.
 
 ---
 
-## Issues in zen-skills-mcp (Self-Critique)
+## Issues in maestro-mcp (Self-Critique)
 
 ### 1. Over-Engineered ❌
 Too many abstractions:
@@ -420,13 +420,13 @@ The ideal implementation would combine:
 | Git state helper | sionic-mcp | MEDIUM |
 | Artifact system | sionic-mcp | MEDIUM |
 | Tests | sionic-mcp | HIGH |
-| MicroStep granularity | zen-skills-mcp | MEDIUM |
-| Calibration system | zen-skills-mcp | MEDIUM |
-| Comprehensive RedFlagger | zen-skills-mcp | MEDIUM |
-| Architecture Selection Engine | zen-skills-mcp | MEDIUM |
-| Metrics Tracking | zen-skills-mcp | LOW |
-| Degradation Strategy | zen-skills-mcp | LOW |
-| Equivalence in voting | zen-skills-mcp | LOW |
+| MicroStep granularity | maestro-mcp | MEDIUM |
+| Calibration system | maestro-mcp | MEDIUM |
+| Comprehensive RedFlagger | maestro-mcp | MEDIUM |
+| Architecture Selection Engine | maestro-mcp | MEDIUM |
+| Metrics Tracking | maestro-mcp | LOW |
+| Degradation Strategy | maestro-mcp | LOW |
+| Equivalence in voting | maestro-mcp | LOW |
 
 ---
 
@@ -434,10 +434,10 @@ The ideal implementation would combine:
 
 **sionic-mcp is more production-ready** despite having less theoretical fidelity to the papers.
 
-**zen-skills-mcp (maestro-mcp) is more academically faithful** but over-engineered.
+**maestro-mcp (maestro-mcp) is more academically faithful** but over-engineered.
 
 ### Recommended Action:
-1. Keep zen-skills-mcp's MAKER/coordination concepts
+1. Keep maestro-mcp's MAKER/coordination concepts
 2. Adopt sionic-mcp's pragmatic patterns (single file, CLI handling, masking)
 3. Add missing critical features (tests, secret masking, JSON schema)
 4. Simplify abstractions

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
-logger = logging.getLogger("zen.providers")
+logger = logging.getLogger("maestro.providers")
 
 # Shared executor for async operations (avoids creating new executor per call)
 _SHARED_EXECUTOR: Optional[ThreadPoolExecutor] = None
@@ -463,9 +463,9 @@ class ProviderRegistry:
         return await asyncio.gather(*tasks)
 
     @classmethod
-    def from_config(cls, config: "ZenConfig") -> "ProviderRegistry":
+    def from_config(cls, config: "MaestroConfig") -> "ProviderRegistry":
         """Create a registry from configuration."""
-        from .config import ZenConfig
+        from .config import MaestroConfig
 
         registry = cls()
 

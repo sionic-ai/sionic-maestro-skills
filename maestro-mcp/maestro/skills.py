@@ -90,46 +90,46 @@ class SkillManifest:
 
     # Core tools that are always loaded (minimal set)
     CORE_TOOLS = [
-        "zen_list_providers",    # Always need to know available providers
-        "zen_get_skill",         # Load skill definitions on-demand
-        "zen_workflow_state",    # Check current workflow state
+        "maestro_list_providers",    # Always need to know available providers
+        "maestro_get_skill",         # Load skill definitions on-demand
+        "maestro_workflow_state",    # Check current workflow state
     ]
 
     # Stage-specific tool sets
     STAGE_TOOLS: Dict[StageType, List[str]] = {
         StageType.ANALYZE: [
-            "zen_pack_context",
-            "zen_log_evidence",
-            "zen_consult",
+            "maestro_pack_context",
+            "maestro_log_evidence",
+            "maestro_consult",
         ],
         StageType.HYPOTHESIZE: [
-            "zen_pack_context",
-            "zen_consult",
-            "zen_ensemble_generate",
-            "zen_consensus_vote",
-            "zen_validate_content",
-            "zen_log_evidence",
+            "maestro_pack_context",
+            "maestro_consult",
+            "maestro_ensemble_generate",
+            "maestro_consensus_vote",
+            "maestro_validate_content",
+            "maestro_log_evidence",
         ],
         StageType.IMPLEMENT: [
-            "zen_consult",
-            "zen_apply_patch",
-            "zen_verify",
-            "zen_log_evidence",
+            "maestro_consult",
+            "maestro_apply_patch",
+            "maestro_verify",
+            "maestro_log_evidence",
         ],
         StageType.DEBUG: [
-            "zen_pack_context",
-            "zen_consult",
-            "zen_verify",
-            "zen_restore_from_backup",
-            "zen_log_evidence",
+            "maestro_pack_context",
+            "maestro_consult",
+            "maestro_verify",
+            "maestro_restore_from_backup",
+            "maestro_log_evidence",
         ],
         StageType.IMPROVE: [
-            "zen_consult",
-            "zen_apply_patch",
-            "zen_verify",
-            "zen_ensemble_generate",
-            "zen_select_best",
-            "zen_log_evidence",
+            "maestro_consult",
+            "maestro_apply_patch",
+            "maestro_verify",
+            "maestro_ensemble_generate",
+            "maestro_select_best",
+            "maestro_log_evidence",
         ],
     }
 

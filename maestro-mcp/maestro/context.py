@@ -23,7 +23,7 @@ from typing import List, Dict, Any, Optional, Set
 from enum import Enum
 from pathlib import Path
 
-logger = logging.getLogger("zen.context")
+logger = logging.getLogger("maestro.context")
 
 
 # =============================================================================
@@ -44,7 +44,7 @@ def configure_repo_roots(roots: List[str]) -> None:
 
 def _init_repo_roots_from_env() -> None:
     """Initialize repo roots from environment on module load."""
-    roots_str = os.getenv("ZEN_REPO_ROOTS", "")
+    roots_str = os.getenv("MAESTRO_REPO_ROOTS", "")
     if roots_str:
         roots = [r.strip() for r in roots_str.split(":") if r.strip()]
         configure_repo_roots(roots)

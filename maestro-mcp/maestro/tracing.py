@@ -1,5 +1,5 @@
 """
-Tracing and Metrics for Zen Skills MCP.
+Tracing and Metrics for Maestro Skills MCP.
 
 Provides observability into:
 - Workflow execution
@@ -32,7 +32,7 @@ from typing import Dict, Any, List, Optional, Union
 from collections import defaultdict
 from enum import Enum
 
-logger = logging.getLogger("zen.tracing")
+logger = logging.getLogger("maestro.tracing")
 
 
 class EvidenceType(Enum):
@@ -192,7 +192,7 @@ class TraceStore:
 
     def __init__(
         self,
-        trace_dir: str = ".zen-traces",
+        trace_dir: str = ".maestro-traces",
         session_id: Optional[str] = None,
         max_memory_entries: int = 1000,
     ):
@@ -837,7 +837,7 @@ class Metrics:
     def summary(self) -> str:
         """Generate a human-readable summary."""
         lines = [
-            "=== Zen Skills Metrics ===",
+            "=== Maestro Skills Metrics ===",
             f"Total Provider Calls: {self.total_calls}",
             f"Success Rate: {self.successful_calls}/{self.total_calls} ({self.successful_calls/self.total_calls*100:.1f}%)" if self.total_calls > 0 else "No calls",
             f"Avg Latency: {self.avg_latency_ms:.0f}ms",

@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, List, Optional, Callable, Tuple
 
-logger = logging.getLogger("zen.selection")
+logger = logging.getLogger("maestro.selection")
 
 
 # ============================================================================

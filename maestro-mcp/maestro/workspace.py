@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Set
 
-logger = logging.getLogger("zen.workspace")
+logger = logging.getLogger("maestro.workspace")
 
 
 @dataclass
@@ -93,7 +93,7 @@ class WorkspaceConfig:
     create_backups: bool = True
 
     # Backup directory (relative to workspace root)
-    backup_dir: str = ".zen-backups"
+    backup_dir: str = ".maestro-backups"
 
 
 class WorkspaceManager:
@@ -241,7 +241,7 @@ class WorkspaceManager:
             # Atomic write using temp file
             fd, temp_path = tempfile.mkstemp(
                 dir=resolved.parent,
-                prefix=".zen_tmp_",
+                prefix=".maestro_tmp_",
                 suffix=resolved.suffix,
             )
             try:

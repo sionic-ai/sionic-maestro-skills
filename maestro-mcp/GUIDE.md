@@ -110,51 +110,51 @@ claude
 # =============================================================================
 
 # Codex (OpenAI)
-ZEN_CODEX_CMD=codex
-ZEN_CODEX_MODEL=gpt-5.2-xhigh
-ZEN_CODEX_TIMEOUT=900
+MAESTRO_CODEX_CMD=codex
+MAESTRO_CODEX_MODEL=gpt-5.2-xhigh
+MAESTRO_CODEX_TIMEOUT=900
 
 # Gemini (Google)
-ZEN_GEMINI_CMD=gemini
-ZEN_GEMINI_MODEL=gemini-3-pro-preview
-ZEN_GEMINI_TIMEOUT=600
+MAESTRO_GEMINI_CMD=gemini
+MAESTRO_GEMINI_MODEL=gemini-3-pro-preview
+MAESTRO_GEMINI_TIMEOUT=600
 
 # Claude (Anthropic) - as consultant, not orchestrator
-ZEN_CLAUDE_CMD=claude
-ZEN_CLAUDE_MODEL=opus
-ZEN_CLAUDE_TIMEOUT=600
+MAESTRO_CLAUDE_CMD=claude
+MAESTRO_CLAUDE_MODEL=opus
+MAESTRO_CLAUDE_TIMEOUT=600
 
 # =============================================================================
 # Coordination Policy
 # =============================================================================
 
 # Skip ensemble if baseline confidence > this (paper: ~45%)
-ZEN_CAPABILITY_THRESHOLD=0.45
+MAESTRO_CAPABILITY_THRESHOLD=0.45
 
 # Budget limits
-ZEN_MAX_CONSULT_PER_STAGE=2
-ZEN_MAX_CONSULT_TOTAL=6
+MAESTRO_MAX_CONSULT_PER_STAGE=2
+MAESTRO_MAX_CONSULT_TOTAL=6
 
 # =============================================================================
 # Context Management
 # =============================================================================
 
 # Maximum tools to expose at once (saves context)
-ZEN_MAX_TOOLS=10
+MAESTRO_MAX_TOOLS=10
 
 # Tools to always disable (comma-separated)
-ZEN_DISABLED_TOOLS=
+MAESTRO_DISABLED_TOOLS=
 
 # Context packing limits
-ZEN_CONTEXT_MAX_FILES=7
-ZEN_CONTEXT_MAX_CHARS=40000
+MAESTRO_CONTEXT_MAX_FILES=7
+MAESTRO_CONTEXT_MAX_CHARS=40000
 
 # =============================================================================
 # Tracing & Logging
 # =============================================================================
 
-ZEN_TRACE_DIR=.zen-traces
-ZEN_LOG_LEVEL=INFO
+MAESTRO_TRACE_DIR=.maestro-traces
+MAESTRO_LOG_LEVEL=INFO
 ```
 
 ### Minimal Configuration
@@ -162,10 +162,10 @@ ZEN_LOG_LEVEL=INFO
 If you only have Claude CLI:
 
 ```bash
-ZEN_CODEX_CMD=
-ZEN_GEMINI_CMD=
-ZEN_CLAUDE_CMD=claude
-ZEN_CLAUDE_MODEL=sonnet
+MAESTRO_CODEX_CMD=
+MAESTRO_GEMINI_CMD=
+MAESTRO_CLAUDE_CMD=claude
+MAESTRO_CLAUDE_MODEL=sonnet
 ```
 
 ---
@@ -181,31 +181,31 @@ claude
 ### 2. Check Available Tools
 
 ```
-You: What zen tools are available?
+You: What maestro tools are available?
 
 Claude: Let me check the available tools.
-[Uses zen_list_providers]
+[Uses maestro_list_providers]
 
 Available providers: claude, codex, gemini
-Available tools: zen_consult, zen_verify, zen_apply_patch, ...
+Available tools: maestro_consult, maestro_verify, maestro_apply_patch, ...
 ```
 
 ### 3. Basic Consultation
 
 ```
-You: Use zen to analyze this error: "TypeError: Cannot read property 'map' of undefined"
+You: Use maestro to analyze this error: "TypeError: Cannot read property 'map' of undefined"
 
 Claude: I'll consult the LLM ensemble to analyze this error.
-[Uses zen_consult with the error context]
+[Uses maestro_consult with the error context]
 ```
 
 ### 4. Run a Full Workflow
 
 ```
-You: Debug the failing test in tests/auth.test.js using the zen workflow
+You: Debug the failing test in tests/auth.test.js using the maestro workflow
 
 Claude: I'll follow the 5-stage workflow to debug this.
-[Uses zen_enter_stage, zen_classify_task, etc.]
+[Uses maestro_enter_stage, maestro_classify_task, etc.]
 ```
 
 ---
@@ -217,10 +217,10 @@ Claude: I'll follow the 5-stage workflow to debug this.
 Ask a single model for advice:
 
 ```
-You: Use zen_consult to ask codex how to optimize this function:
+You: Use maestro_consult to ask codex how to optimize this function:
 [paste function]
 
-Claude: [Uses zen_consult]
+Claude: [Uses maestro_consult]
 Result: Codex suggests using memoization...
 ```
 
@@ -232,14 +232,14 @@ Generate multiple solutions and pick the best:
 You: Generate 3 different approaches to implement user authentication
 
 Claude: I'll use ensemble generation to get diverse solutions.
-[Uses zen_ensemble_generate with providers=["codex", "gemini", "claude"]]
+[Uses maestro_ensemble_generate with providers=["codex", "gemini", "claude"]]
 
 Got 3 candidates:
 1. JWT-based (Codex)
 2. Session-based (Gemini)
 3. OAuth2 (Claude)
 
-[Uses zen_select_best with test_results]
+[Uses maestro_select_best with test_results]
 Selected: JWT-based approach (passes all tests, smallest diff)
 ```
 
@@ -252,7 +252,7 @@ You: I need to fix a complex bug that spans multiple files.
 Should I use multi-agent or single-agent approach?
 
 Claude: Let me analyze the task structure.
-[Uses zen_classify_task]
+[Uses maestro_classify_task]
 
 Result:
 - decomposability_score: 0.3 (low - hard to parallelize)
@@ -271,7 +271,7 @@ Use error-corrected voting for critical decisions:
 You: What's the root cause of this NullPointerException? Use voting to be sure.
 
 Claude: I'll use MAKER-style voting for accuracy.
-[Uses zen_vote_micro_step with step_type="h1_root_cause", k=3]
+[Uses maestro_vote_micro_step with step_type="h1_root_cause", k=3]
 
 Voting results:
 - Round 1: "uninitialized user" (codex)
@@ -292,19 +292,19 @@ Apply code changes with automatic backup:
 You: Apply this fix to src/auth.js
 
 Claude: I'll apply the patch safely with backup.
-[Uses zen_apply_patch with dry_run=True first]
+[Uses maestro_apply_patch with dry_run=True first]
 
 Dry run result:
 - Files to modify: src/auth.js
 - Lines changed: +5, -2
 - No conflicts detected
 
-[Uses zen_apply_patch with dry_run=False]
+[Uses maestro_apply_patch with dry_run=False]
 
 Patch applied successfully.
-Backup saved to: .zen-backups/20250615-143022/
+Backup saved to: .maestro-backups/20250615-143022/
 
-[Uses zen_verify to run tests]
+[Uses maestro_verify to run tests]
 All tests passing.
 ```
 
@@ -314,12 +314,12 @@ All tests passing.
 You: The tests are failing after the patch. Roll back.
 
 Claude: I'll restore from backup.
-[Uses zen_restore_from_backup]
+[Uses maestro_restore_from_backup]
 
 Restored files:
 - src/auth.js
 
-[Uses zen_verify]
+[Uses maestro_verify]
 Tests passing again.
 ```
 
@@ -333,11 +333,11 @@ Tests passing again.
 # Stage 1: Analyze
 You: Debug the failing login test. Start with analysis.
 
-Claude: [Uses zen_enter_stage("analyze")]
-        [Uses zen_classify_task]
-        [Uses zen_pack_context with error logs]
-        [Uses zen_consult for initial analysis]
-        [Uses zen_log_evidence]
+Claude: [Uses maestro_enter_stage("analyze")]
+        [Uses maestro_classify_task]
+        [Uses maestro_pack_context with error logs]
+        [Uses maestro_consult for initial analysis]
+        [Uses maestro_log_evidence]
 
 Analysis complete:
 - Observations: [list]
@@ -347,9 +347,9 @@ Analysis complete:
 # Stage 2: Hypothesize
 You: Generate hypotheses for the root cause.
 
-Claude: [Uses zen_enter_stage("hypothesize")]
-        [Uses zen_ensemble_generate]  # OK for hypothesis gen
-        [Uses zen_select_best with scoring]
+Claude: [Uses maestro_enter_stage("hypothesize")]
+        [Uses maestro_ensemble_generate]  # OK for hypothesis gen
+        [Uses maestro_select_best with scoring]
 
 Top hypotheses:
 1. Session timeout not handled (score: 0.85)
@@ -358,35 +358,35 @@ Top hypotheses:
 # Stage 3: Implement
 You: Implement the fix for hypothesis 1.
 
-Claude: [Uses zen_enter_stage("implement")]
-        [Uses zen_consult for patch generation]  # Single agent for impl
-        [Uses zen_apply_patch with dry_run=True]
-        [Uses zen_apply_patch]
-        [Uses zen_verify]
+Claude: [Uses maestro_enter_stage("implement")]
+        [Uses maestro_consult for patch generation]  # Single agent for impl
+        [Uses maestro_apply_patch with dry_run=True]
+        [Uses maestro_apply_patch]
+        [Uses maestro_verify]
 
 Patch applied. Running tests...
 
 # Stage 4: Debug (if tests fail)
 You: Tests still failing. Debug it.
 
-Claude: [Uses zen_enter_stage("debug")]
-        [Uses zen_get_stage_strategy]  # Confirms SAS
+Claude: [Uses maestro_enter_stage("debug")]
+        [Uses maestro_get_stage_strategy]  # Confirms SAS
 
         # Single-agent debug loop (max 5 iterations)
         Iteration 1:
-        [Uses zen_verify to get failure details]
-        [Uses zen_consult to analyze]
-        [Uses zen_apply_patch for fix]
-        [Uses zen_verify]
+        [Uses maestro_verify to get failure details]
+        [Uses maestro_consult to analyze]
+        [Uses maestro_apply_patch for fix]
+        [Uses maestro_verify]
 
         Tests passing after 2 iterations.
 
 # Stage 5: Improve
 You: Extract learnings from this fix.
 
-Claude: [Uses zen_enter_stage("improve")]
-        [Uses zen_log_evidence with fix pattern]
-        [Uses zen_record_coordination_result]
+Claude: [Uses maestro_enter_stage("improve")]
+        [Uses maestro_log_evidence with fix pattern]
+        [Uses maestro_record_coordination_result]
 
 Recorded:
 - Pattern: "Session timeout handling"
@@ -403,8 +403,8 @@ For simple, obvious fixes:
 You: Fix this typo in the error message
 
 Claude: This is a simple fix, no need for full workflow.
-        [Uses zen_apply_patch directly]
-        [Uses zen_verify]
+        [Uses maestro_apply_patch directly]
+        [Uses maestro_verify]
 
 Done. Typo fixed, tests passing.
 ```
@@ -417,18 +417,18 @@ When you're not sure what's wrong:
 You: Something's wrong with the API but I don't know what. Explore.
 
 Claude: I'll use multi-agent exploration.
-        [Uses zen_classify_task]
+        [Uses maestro_classify_task]
         → decomposability: 0.7 (can parallelize exploration)
 
-        [Uses zen_select_architecture]
+        [Uses maestro_select_architecture]
         → topology: mas_independent
 
-        [Uses zen_ensemble_generate]
+        [Uses maestro_ensemble_generate]
         - Codex: Checks request/response formats
         - Gemini: Analyzes error patterns
         - Claude: Reviews authentication flow
 
-        [Uses zen_select_best]
+        [Uses maestro_select_best]
 
 Found: Authentication header malformed in 3 endpoints.
 ```
@@ -451,17 +451,17 @@ Found: Authentication header malformed in 3 endpoints.
 
 ```
 # GOOD: Let tests decide
-zen_select_best(candidates, mode="tests_first", test_results=[...])
+maestro_select_best(candidates, mode="tests_first", test_results=[...])
 
 # AVOID: Pure voting for code
-zen_select_best(candidates, mode="llm_judge")  # Only when tests unavailable
+maestro_select_best(candidates, mode="llm_judge")  # Only when tests unavailable
 ```
 
 ### 3. Red-flag Early
 
 ```
 # Validate before using any LLM output
-result = zen_validate_content(response, content_type="json")
+result = maestro_validate_content(response, content_type="json")
 if not result["is_valid"]:
     # Discard and retry, don't try to fix
     retry()
@@ -471,10 +471,10 @@ if not result["is_valid"]:
 
 ```
 # After each coordination
-zen_record_coordination_result(topology, success, tokens_used)
+maestro_record_coordination_result(topology, success, tokens_used)
 
 # Periodically check
-stats = zen_get_coordination_stats()
+stats = maestro_get_coordination_stats()
 if stats["best_topology"] != current:
     # Consider switching
 ```
@@ -483,7 +483,7 @@ if stats["best_topology"] != current:
 
 ```
 # Check during long operations
-degradation = zen_check_degradation(
+degradation = maestro_check_degradation(
     current_topology="mas_independent",
     successes=2, failures=5
 )
@@ -496,10 +496,10 @@ if degradation["should_degrade"]:
 
 ```
 # Load only what you need
-zen_enter_stage("debug")  # Loads ~6 tools
+maestro_enter_stage("debug")  # Loads ~6 tools
 
 # Unload when done
-zen_exit_stage()  # Back to 3 core tools
+maestro_exit_stage()  # Back to 3 core tools
 ```
 
 ---
@@ -525,7 +525,7 @@ cat .env | grep CODEX
 ### Problem: "MCP server not running"
 
 ```
-/mcp shows zen-skills-mcp as disconnected
+/mcp shows maestro-mcp as disconnected
 ```
 
 **Solution:**
@@ -539,9 +539,9 @@ which python3
 ```json
 {
   "mcpServers": {
-    "zen-skills-mcp": {
+    "maestro-mcp": {
       "command": "python3",
-      "args": ["zen-skills-mcp/server.py"]  // Check this path
+      "args": ["maestro-mcp/server.py"]  // Check this path
     }
   }
 }
@@ -549,7 +549,7 @@ which python3
 
 3. Test server directly:
 ```bash
-python3 zen-skills-mcp/server.py
+python3 maestro-mcp/server.py
 # Should start without errors
 ```
 
@@ -562,9 +562,9 @@ Error: Command timed out after 300s
 **Solution:** Increase timeout in .env:
 
 ```bash
-ZEN_CODEX_TIMEOUT=900
-ZEN_GEMINI_TIMEOUT=900
-ZEN_CLAUDE_TIMEOUT=900
+MAESTRO_CODEX_TIMEOUT=900
+MAESTRO_GEMINI_TIMEOUT=900
+MAESTRO_CLAUDE_TIMEOUT=900
 ```
 
 ### Problem: "Too many tools, context overflow"
@@ -572,8 +572,8 @@ ZEN_CLAUDE_TIMEOUT=900
 **Solution:** Reduce max tools or disable unused ones:
 
 ```bash
-ZEN_MAX_TOOLS=8
-ZEN_DISABLED_TOOLS=zen_run_stage,zen_get_metrics,zen_get_coordination_policy
+MAESTRO_MAX_TOOLS=8
+MAESTRO_DISABLED_TOOLS=maestro_run_stage,maestro_get_metrics,maestro_get_coordination_policy
 ```
 
 ### Problem: "Red-flagged responses"
@@ -585,8 +585,8 @@ All candidates were red-flagged
 **Solution:** Check red-flag thresholds:
 
 ```python
-# In zen_validate_content call, adjust limits
-zen_validate_content(
+# In maestro_validate_content call, adjust limits
+maestro_validate_content(
     content=response,
     max_chars=20000,  # Increase if responses are legitimately long
 )
@@ -598,7 +598,7 @@ zen_validate_content(
 
 ```python
 # View current stats
-stats = zen_get_coordination_stats()
+stats = maestro_get_coordination_stats()
 
 # If MAS is consistently failing, it might be correct to use SAS
 # Or adjust the degradation thresholds in coordination policy
@@ -607,10 +607,10 @@ stats = zen_get_coordination_stats()
 ### Problem: "Tests not found"
 
 ```
-zen_verify: Command not in allowlist
+maestro_verify: Command not in allowlist
 ```
 
-**Solution:** The command must be in the allowlist. Check `zen/verify.py`:
+**Solution:** The command must be in the allowlist. Check `maestro/verify.py`:
 
 ```python
 ALLOWED_COMMANDS = [
@@ -626,17 +626,17 @@ ALLOWED_COMMANDS = [
 
 1. **Check logs:**
    ```bash
-   cat .zen-traces/latest.jsonl
+   cat .maestro-traces/latest.jsonl
    ```
 
 2. **Enable debug logging:**
    ```bash
-   ZEN_LOG_LEVEL=DEBUG
+   MAESTRO_LOG_LEVEL=DEBUG
    ```
 
 3. **View evidence chain:**
    ```
-   zen_get_evidence_chain(limit=20)
+   maestro_get_evidence_chain(limit=20)
    ```
 
 4. **Report issues:**
@@ -648,5 +648,5 @@ ALLOWED_COMMANDS = [
 
 1. **Read ARCHITECTURE.md** - Understand the system design
 2. **Try the examples** - Start with simple consultations
-3. **Monitor metrics** - Use `zen_get_coordination_stats()`
+3. **Monitor metrics** - Use `maestro_get_coordination_stats()`
 4. **Customize** - Edit `conf/skill_manifest.yaml` for your workflow

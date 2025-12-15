@@ -97,7 +97,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=False,
         red_flag_rules=["too_long", "missing_fields"],
-        required_tools=["zen_pack_context", "zen_log_evidence"]
+        required_tools=["maestro_pack_context", "maestro_log_evidence"]
     ),
     MicroStepType.S2_EDGE_CASE: MicroStepSpec(
         step_type=MicroStepType.S2_EDGE_CASE,
@@ -115,7 +115,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=False,
         red_flag_rules=["too_long", "missing_fields"],
-        required_tools=["zen_pack_context", "zen_log_evidence"]
+        required_tools=["maestro_pack_context", "maestro_log_evidence"]
     ),
     MicroStepType.S3_MRE: MicroStepSpec(
         step_type=MicroStepType.S3_MRE,
@@ -133,7 +133,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=3,
         has_oracle=True,  # Can run the MRE to verify
         red_flag_rules=["too_long", "missing_fields", "dangerous_code"],
-        required_tools=["zen_pack_context", "zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_pack_context", "maestro_verify", "maestro_log_evidence"]
     ),
 
     # Hypothesize steps
@@ -154,7 +154,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=3,
         has_oracle=False,
         red_flag_rules=["too_long", "missing_fields", "hedging"],
-        required_tools=["zen_consult", "zen_log_evidence"]
+        required_tools=["maestro_consult", "maestro_log_evidence"]
     ),
     MicroStepType.H2_VERIFICATION: MicroStepSpec(
         step_type=MicroStepType.H2_VERIFICATION,
@@ -173,7 +173,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=True,  # Can run the experiment
         red_flag_rules=["too_long", "missing_fields", "dangerous_command"],
-        required_tools=["zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_verify", "maestro_log_evidence"]
     ),
 
     # Implement steps
@@ -193,7 +193,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=3,
         has_oracle=True,  # Can apply and test
         red_flag_rules=["too_long", "missing_fields", "multi_file", "invalid_diff"],
-        required_tools=["zen_apply_patch", "zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_apply_patch", "maestro_verify", "maestro_log_evidence"]
     ),
     MicroStepType.C2_COMPILE_CHECK: MicroStepSpec(
         step_type=MicroStepType.C2_COMPILE_CHECK,
@@ -211,7 +211,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=True,  # Compiler is the oracle
         red_flag_rules=["missing_fields"],
-        required_tools=["zen_verify", "zen_apply_patch"]
+        required_tools=["maestro_verify", "maestro_apply_patch"]
     ),
 
     # Debug steps
@@ -234,7 +234,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=False,
         red_flag_rules=["missing_fields"],
-        required_tools=["zen_pack_context", "zen_log_evidence"]
+        required_tools=["maestro_pack_context", "maestro_log_evidence"]
     ),
     MicroStepType.D2_NEXT_EXPERIMENT: MicroStepSpec(
         step_type=MicroStepType.D2_NEXT_EXPERIMENT,
@@ -252,7 +252,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=3,
         has_oracle=True,
         red_flag_rules=["missing_fields", "dangerous_command"],
-        required_tools=["zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_verify", "maestro_log_evidence"]
     ),
 
     # Improve steps
@@ -273,7 +273,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=True,  # Tests are oracle
         red_flag_rules=["too_long", "missing_fields", "multi_file", "invalid_diff"],
-        required_tools=["zen_apply_patch", "zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_apply_patch", "maestro_verify", "maestro_log_evidence"]
     ),
     MicroStepType.R2_PERF: MicroStepSpec(
         step_type=MicroStepType.R2_PERF,
@@ -292,7 +292,7 @@ MICRO_STEP_SPECS: Dict[MicroStepType, MicroStepSpec] = {
         default_k=2,
         has_oracle=True,
         red_flag_rules=["too_long", "missing_fields", "invalid_diff"],
-        required_tools=["zen_apply_patch", "zen_verify", "zen_log_evidence"]
+        required_tools=["maestro_apply_patch", "maestro_verify", "maestro_log_evidence"]
     ),
 }
 

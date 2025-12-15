@@ -18,11 +18,11 @@ from enum import Enum
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 
-logger = logging.getLogger("zen.workflow")
+logger = logging.getLogger("maestro.workflow")
 
 
 class Stage(Enum):
-    """The 5 stages of the Zen workflow."""
+    """The 5 stages of the Maestro workflow."""
     ANALYZE = "analyze"
     HYPOTHESIZE = "hypothesize"
     IMPLEMENT = "implement"

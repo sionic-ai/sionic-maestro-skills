@@ -98,81 +98,81 @@ claude
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_consult` | Single model consultation | Analysis, review, specific questions |
-| `zen_consult_with_role` | Consultation with persona | Stage-specific prompting |
-| `zen_ensemble_generate` | Multi-model candidates | Hypothesis generation, exploration |
-| `zen_select_best` | Pick best candidate | After ensemble, with test results |
+| `maestro_consult` | Single model consultation | Analysis, review, specific questions |
+| `maestro_consult_with_role` | Consultation with persona | Stage-specific prompting |
+| `maestro_ensemble_generate` | Multi-model candidates | Hypothesis generation, exploration |
+| `maestro_select_best` | Pick best candidate | After ensemble, with test results |
 
 ### Workflow Tools
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_run_stage` | Execute workflow stage | Structured 5-stage workflow |
-| `zen_workflow_state` | Check progress | Monitor budget, see metrics |
-| `zen_get_skill` | Get stage skill definition | Before starting a stage |
-| `zen_get_role` | Get persona prompt | Role-based consultation |
-| `zen_get_schema` | Get output schema | Validate stage outputs |
-| `zen_get_coordination_policy` | Get paper-aligned rules | Understand when to use MAS |
+| `maestro_run_stage` | Execute workflow stage | Structured 5-stage workflow |
+| `maestro_workflow_state` | Check progress | Monitor budget, see metrics |
+| `maestro_get_skill` | Get stage skill definition | Before starting a stage |
+| `maestro_get_role` | Get persona prompt | Role-based consultation |
+| `maestro_get_schema` | Get output schema | Validate stage outputs |
+| `maestro_get_coordination_policy` | Get paper-aligned rules | Understand when to use MAS |
 
 ### Verification Tools
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_verify` | Run tests/lint/type-check | Before accepting any change |
-| `zen_validate_content` | Red-flag validation | Validate LLM responses |
+| `maestro_verify` | Run tests/lint/type-check | Before accepting any change |
+| `maestro_validate_content` | Red-flag validation | Validate LLM responses |
 
 ### Workspace Tools
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_apply_patch` | Apply unified diff safely | Implementing code changes |
-| `zen_restore_from_backup` | Rollback changes | When a patch introduces bugs |
+| `maestro_apply_patch` | Apply unified diff safely | Implementing code changes |
+| `maestro_restore_from_backup` | Rollback changes | When a patch introduces bugs |
 
 ### Consensus Tools (MAKER-style)
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_consensus_vote` | First-to-ahead-by-k voting | Micro-decisions (file selection, yes/no) |
+| `maestro_consensus_vote` | First-to-ahead-by-k voting | Micro-decisions (file selection, yes/no) |
 
 ### Evidence & Metrics Tools
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_log_evidence` | Log to reasoning chain | Track observations, decisions |
-| `zen_get_evidence_chain` | Query evidence | Audit decision trail |
-| `zen_get_metrics` | Paper-aligned metrics | Performance analysis |
-| `zen_list_providers` | Show available CLIs | Configuration check |
-| `zen_pack_context` | Smart context packing | Before any consultation |
+| `maestro_log_evidence` | Log to reasoning chain | Track observations, decisions |
+| `maestro_get_evidence_chain` | Query evidence | Audit decision trail |
+| `maestro_get_metrics` | Paper-aligned metrics | Performance analysis |
+| `maestro_list_providers` | Show available CLIs | Configuration check |
+| `maestro_pack_context` | Smart context packing | Before any consultation |
 
 ### Dynamic Skill Loading Tools (NEW - Context Optimization)
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_enter_stage` | Enter stage + load tools | Starting a workflow stage |
-| `zen_enter_skill` | Enter skill + load tools | Fine-grained tool loading |
-| `zen_exit_stage` | Exit stage + unload tools | Transitioning between stages |
-| `zen_get_loaded_tools` | Show loaded tools | Check available tools |
-| `zen_recommend_tools` | Recommend tools for task | Before starting any work |
+| `maestro_enter_stage` | Enter stage + load tools | Starting a workflow stage |
+| `maestro_enter_skill` | Enter skill + load tools | Fine-grained tool loading |
+| `maestro_exit_stage` | Exit stage + unload tools | Transitioning between stages |
+| `maestro_get_loaded_tools` | Show loaded tools | Check available tools |
+| `maestro_recommend_tools` | Recommend tools for task | Before starting any work |
 
 ### MAKER-style Micro-step Tools (Error Correction)
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_get_micro_steps` | Get atomic step definitions | Planning decomposition |
-| `zen_vote_micro_step` | Vote on micro-step result | Error-corrected execution |
-| `zen_calibrate` | Calibrate voting k parameter | Before long workflows |
-| `zen_red_flag_check` | Check for format errors | Before accepting any output |
+| `maestro_get_micro_steps` | Get atomic step definitions | Planning decomposition |
+| `maestro_vote_micro_step` | Vote on micro-step result | Error-corrected execution |
+| `maestro_calibrate` | Calibrate voting k parameter | Before long workflows |
+| `maestro_red_flag_check` | Check for format errors | Before accepting any output |
 
 ### Coordination Tools (NEW - Architecture Selection)
 
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `zen_classify_task` | Analyze task structure | Start of Stage 1 (Analyze) |
-| `zen_select_architecture` | Choose SAS vs MAS topology | Before each stage |
-| `zen_check_degradation` | Check if should fall back | During coordination |
-| `zen_record_coordination_result` | Record for calibration | After each coordination |
-| `zen_get_coordination_stats` | Get calibration data | Monitor effectiveness |
-| `zen_get_stage_strategy` | Get stage-specific strategy | Before executing stage |
+| `maestro_classify_task` | Analyze task structure | Start of Stage 1 (Analyze) |
+| `maestro_select_architecture` | Choose SAS vs MAS topology | Before each stage |
+| `maestro_check_degradation` | Check if should fall back | During coordination |
+| `maestro_record_coordination_result` | Record for calibration | After each coordination |
+| `maestro_get_coordination_stats` | Get calibration data | Monitor effectiveness |
+| `maestro_get_stage_strategy` | Get stage-specific strategy | Before executing stage |
 
 ## The 5-Stage Workflow
 
@@ -186,19 +186,19 @@ claude
 **Goal**: Generate competing explanations.
 - Use ensemble generation (best stage for MAS!)
 - Each hypothesis needs a verification test
-- Select with `zen_select_best`
+- Select with `maestro_select_best`
 
 ### Stage 3: Implement
 **Goal**: Apply minimal, testable changes.
 - Single agent PREFERRED (tool-heavy)
 - Test after EVERY change
-- Use `zen_apply_patch` for safe modifications
+- Use `maestro_apply_patch` for safe modifications
 
 ### Stage 4: Debug
 **Goal**: Fix without divergence.
 - Single agent ONLY (paper shows MAS degrades here)
 - 5 iteration limit
-- Use `zen_restore_from_backup` if needed
+- Use `maestro_restore_from_backup` if needed
 
 ### Stage 5: Improve
 **Goal**: Refactor and stabilize.
@@ -214,26 +214,26 @@ Minimize context overhead by loading only the tools needed for the current task:
 
 ```python
 # Enter a stage - loads stage-specific tools
-result = zen_enter_stage("hypothesize")
-# Returns: {"loaded_tools": ["zen_ensemble_generate", "zen_consensus_vote", ...]}
+result = maestro_enter_stage("hypothesize")
+# Returns: {"loaded_tools": ["maestro_ensemble_generate", "maestro_consensus_vote", ...]}
 
 # Enter a specific skill - even finer-grained loading
-result = zen_enter_skill("root_cause_analysis")
-# Returns: {"loaded_tools": ["zen_consult", "zen_log_evidence"]}
+result = maestro_enter_skill("root_cause_analysis")
+# Returns: {"loaded_tools": ["maestro_consult", "maestro_log_evidence"]}
 
 # Check what's loaded
-result = zen_get_loaded_tools()
+result = maestro_get_loaded_tools()
 # Returns: {"loaded_tools": [...], "context_cost": 600}
 
 # Exit stage - unload to core tools only
-result = zen_exit_stage()
-# Returns: {"loaded_tools": ["zen_list_providers", "zen_get_skill", "zen_workflow_state"]}
+result = maestro_exit_stage()
+# Returns: {"loaded_tools": ["maestro_list_providers", "maestro_get_skill", "maestro_workflow_state"]}
 ```
 
 Configure via environment variables:
 ```bash
-ZEN_MAX_TOOLS=10           # Maximum tools to expose at once
-ZEN_DISABLED_TOOLS=zen_run_stage,zen_get_metrics  # Always disable these
+MAESTRO_MAX_TOOLS=10           # Maximum tools to expose at once
+MAESTRO_DISABLED_TOOLS=maestro_run_stage,maestro_get_metrics  # Always disable these
 ```
 
 ### MAKER-style Micro-step Decomposition (MAD)
@@ -242,11 +242,11 @@ Break tasks into atomic steps for error-corrected execution:
 
 ```python
 # Get available micro-steps for a stage
-result = zen_get_micro_steps("hypothesize")
+result = maestro_get_micro_steps("hypothesize")
 # Returns micro-steps: h1_root_cause, h2_verification
 
 # Vote on a micro-step with error correction
-result = zen_vote_micro_step(
+result = maestro_vote_micro_step(
     step_type="h1_root_cause",
     prompt="What is the most likely root cause of the NullPointerException?",
     context="Error at line 42 in UserService.java...",
@@ -269,7 +269,7 @@ Automatically select optimal coordination topology based on task structure:
 
 ```python
 # 1. Classify task structure at start
-result = zen_classify_task(
+result = maestro_classify_task(
     task_description="Fix the authentication bug in login flow",
     error_logs="NullPointerException at AuthService.java:42..."
 )
@@ -280,7 +280,7 @@ result = zen_classify_task(
 # }
 
 # 2. Select architecture for each stage
-result = zen_select_architecture(
+result = maestro_select_architecture(
     stage="hypothesize",
     decomposability_score=0.8,
     sequential_dependency_score=0.2
@@ -288,7 +288,7 @@ result = zen_select_architecture(
 # Returns: {"topology": "mas_independent", "max_agents": 3}
 
 # 3. Check for degradation during execution
-result = zen_check_degradation(
+result = maestro_check_degradation(
     current_topology="mas_independent",
     successes=2, failures=5,
     redundancy_rate=0.9
@@ -296,7 +296,7 @@ result = zen_check_degradation(
 # Returns: {"should_degrade": True, "reason": "High redundancy (0.9)..."}
 
 # 4. Record results for calibration (Rule D)
-zen_record_coordination_result(
+maestro_record_coordination_result(
     topology="mas_independent",
     success=True,
     tokens_used=5000
@@ -321,7 +321,7 @@ Calibrate the voting parameter k before long workflows:
 
 ```python
 # Calibrate k for a step type
-result = zen_calibrate(
+result = maestro_calibrate(
     step_type="c1_minimal_patch",
     test_prompt="Generate a patch to fix the null check...",
     oracle_command="pytest tests/",  # Optional oracle
@@ -338,7 +338,7 @@ Reject malformed responses BEFORE selection:
 
 ```python
 # Validate any content before using it
-result = zen_validate_content(
+result = maestro_validate_content(
     content=response,
     content_type="json",  # or "diff", "general"
     require_json_fields=["hypothesis", "confidence"]
@@ -360,7 +360,7 @@ For micro-decisions, use voting instead of single-shot:
 
 ```python
 # Which file is most likely the bug source?
-result = zen_consensus_vote(
+result = maestro_consensus_vote(
     question="Which file is most likely the source of the authentication bug? Answer with ONLY the filename.",
     k=3,  # Need 3-vote lead to win
     providers=["codex", "gemini", "claude"]
@@ -383,7 +383,7 @@ Track reasoning for auditability:
 
 ```python
 # Log an observation
-obs_id = zen_log_evidence(
+obs_id = maestro_log_evidence(
     evidence_type="observation",
     stage="analyze",
     content={"error": "NullPointerException at line 42"},
@@ -391,7 +391,7 @@ obs_id = zen_log_evidence(
 )
 
 # Log a hypothesis linked to the observation
-hyp_id = zen_log_evidence(
+hyp_id = maestro_log_evidence(
     evidence_type="hypothesis",
     stage="hypothesize",
     content={"claim": "Uninitialized user object"},
@@ -400,7 +400,7 @@ hyp_id = zen_log_evidence(
 )
 
 # Query the chain
-chain = zen_get_evidence_chain(stage="analyze")
+chain = maestro_get_evidence_chain(stage="analyze")
 ```
 
 ### Safe Patch Application
@@ -408,7 +408,7 @@ chain = zen_get_evidence_chain(stage="analyze")
 Apply patches with automatic backup:
 
 ```python
-result = zen_apply_patch(
+result = maestro_apply_patch(
     patch="""
 --- a/src/auth.py
 +++ b/src/auth.py
@@ -423,7 +423,7 @@ result = zen_apply_patch(
 
 # If something goes wrong, rollback
 if tests_failed:
-    zen_restore_from_backup(result["backup_session"])
+    maestro_restore_from_backup(result["backup_session"])
 ```
 
 ## Usage Examples
@@ -435,36 +435,36 @@ User: "Debug the failing login test"
 
 Claude Code will:
 1. [ANALYZE]
-   - zen_pack_context(files=["tests/test_auth.py"], errors=[...])
-   - zen_log_evidence(type="observation", content={"error": "..."})
+   - maestro_pack_context(files=["tests/test_auth.py"], errors=[...])
+   - maestro_log_evidence(type="observation", content={"error": "..."})
 
 2. [HYPOTHESIZE]
-   - zen_ensemble_generate(task="Root causes for...", providers=["codex", "gemini"])
-   - zen_validate_content(content=..., content_type="json")  # Red-flag check
-   - zen_select_best(candidates=..., mode="tests_first")
-   - zen_log_evidence(type="hypothesis", ...)
+   - maestro_ensemble_generate(task="Root causes for...", providers=["codex", "gemini"])
+   - maestro_validate_content(content=..., content_type="json")  # Red-flag check
+   - maestro_select_best(candidates=..., mode="tests_first")
+   - maestro_log_evidence(type="hypothesis", ...)
 
 3. [IMPLEMENT]
-   - zen_apply_patch(patch=..., dry_run=True)  # Validate first
-   - zen_apply_patch(patch=..., dry_run=False)  # Apply with backup
+   - maestro_apply_patch(patch=..., dry_run=True)  # Validate first
+   - maestro_apply_patch(patch=..., dry_run=False)  # Apply with backup
 
 4. [VERIFY]
-   - zen_verify([{"command": "pytest tests/test_auth.py", "type": "unit_test"}])
+   - maestro_verify([{"command": "pytest tests/test_auth.py", "type": "unit_test"}])
 
 5. [DEBUG] if tests fail
-   - zen_restore_from_backup(backup_session)  # Rollback
+   - maestro_restore_from_backup(backup_session)  # Rollback
    - Single-agent iteration
 
 6. [IMPROVE]
    - Add regression tests
-   - zen_log_evidence(type="decision", content={"action": "Added test coverage"})
+   - maestro_log_evidence(type="decision", content={"action": "Added test coverage"})
 ```
 
 ### Micro-decision with Consensus
 
 ```python
 # When unsure which file to investigate
-result = zen_consensus_vote(
+result = maestro_consensus_vote(
     question="""
     Given this error: "TypeError: 'NoneType' object is not iterable"
 
@@ -487,30 +487,30 @@ result = zen_consensus_vote(
 
 ```bash
 # Provider configuration (best models)
-ZEN_CODEX_CMD=codex
-ZEN_CODEX_MODEL=gpt-5.2-xhigh
-ZEN_CODEX_TIMEOUT=900
+MAESTRO_CODEX_CMD=codex
+MAESTRO_CODEX_MODEL=gpt-5.2-xhigh
+MAESTRO_CODEX_TIMEOUT=900
 
-ZEN_GEMINI_CMD=gemini
-ZEN_GEMINI_MODEL=gemini-3-pro-preview
-ZEN_GEMINI_TIMEOUT=600
+MAESTRO_GEMINI_CMD=gemini
+MAESTRO_GEMINI_MODEL=gemini-3-pro-preview
+MAESTRO_GEMINI_TIMEOUT=600
 
-ZEN_CLAUDE_CMD=claude
-ZEN_CLAUDE_MODEL=opus
-ZEN_CLAUDE_TIMEOUT=600
+MAESTRO_CLAUDE_CMD=claude
+MAESTRO_CLAUDE_MODEL=opus
+MAESTRO_CLAUDE_TIMEOUT=600
 
 # Coordination policy
-ZEN_CAPABILITY_THRESHOLD=0.45    # Skip ensemble above this confidence
-ZEN_MAX_CONSULT_PER_STAGE=2
-ZEN_MAX_CONSULT_TOTAL=6
+MAESTRO_CAPABILITY_THRESHOLD=0.45    # Skip ensemble above this confidence
+MAESTRO_MAX_CONSULT_PER_STAGE=2
+MAESTRO_MAX_CONSULT_TOTAL=6
 
 # Context packing
-ZEN_CONTEXT_MAX_FILES=7
-ZEN_CONTEXT_MAX_CHARS=40000
+MAESTRO_CONTEXT_MAX_FILES=7
+MAESTRO_CONTEXT_MAX_CHARS=40000
 
 # Tracing
-ZEN_TRACE_DIR=.zen-traces
-ZEN_LOG_LEVEL=INFO
+MAESTRO_TRACE_DIR=.maestro-traces
+MAESTRO_LOG_LEVEL=INFO
 ```
 
 ### Disabling Tools
@@ -518,7 +518,7 @@ ZEN_LOG_LEVEL=INFO
 To reduce context overhead (as PAL MCP suggests):
 
 ```bash
-ZEN_DISABLED_TOOLS=zen_run_stage,zen_workflow_state
+MAESTRO_DISABLED_TOOLS=maestro_run_stage,maestro_workflow_state
 ```
 
 ## Paper-Aligned Metrics
@@ -563,7 +563,7 @@ maestro-mcp/
 │   ├── stage4_output.json
 │   ├── stage5_output.json
 │   └── judge_output.json
-└── zen/
+└── maestro/
     ├── __init__.py
     ├── config.py          # Configuration management
     ├── providers.py       # CLI provider implementations

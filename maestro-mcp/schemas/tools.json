@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Zen Skills MCP Tool Schemas",
+  "title": "Maestro Skills MCP Tool Schemas",
   "description": "JSON Schema definitions for all MCP tools",
 
   "definitions": {
@@ -91,8 +91,8 @@
       }
     },
 
-    "zen_consult": {
-      "title": "zen_consult",
+    "maestro_consult": {
+      "title": "maestro_consult",
       "description": "Single-model consultation with role-based prompting",
       "input": {
         "type": "object",
@@ -113,7 +113,7 @@
           },
           "context": {
             "type": "string",
-            "description": "Additional context (from zen_pack_context)"
+            "description": "Additional context (from maestro_pack_context)"
           },
           "output_schema": {
             "type": "string",
@@ -148,8 +148,8 @@
       }
     },
 
-    "zen_ensemble_generate": {
-      "title": "zen_ensemble_generate",
+    "maestro_ensemble_generate": {
+      "title": "maestro_ensemble_generate",
       "description": "Generate candidates from multiple providers in parallel",
       "input": {
         "type": "object",
@@ -221,8 +221,8 @@
       }
     },
 
-    "zen_select_best": {
-      "title": "zen_select_best",
+    "maestro_select_best": {
+      "title": "maestro_select_best",
       "description": "Select best candidate using tests-first methodology",
       "input": {
         "type": "object",
@@ -324,8 +324,8 @@
       }
     },
 
-    "zen_pack_context": {
-      "title": "zen_pack_context",
+    "maestro_pack_context": {
+      "title": "maestro_pack_context",
       "description": "Pack files and context intelligently for consultation",
       "input": {
         "type": "object",
@@ -397,8 +397,8 @@
       }
     },
 
-    "zen_run_stage": {
-      "title": "zen_run_stage",
+    "maestro_run_stage": {
+      "title": "maestro_run_stage",
       "description": "Execute a specific workflow stage",
       "input": {
         "type": "object",
@@ -453,8 +453,8 @@
       }
     },
 
-    "zen_workflow_state": {
-      "title": "zen_workflow_state",
+    "maestro_workflow_state": {
+      "title": "maestro_workflow_state",
       "description": "Get current workflow state and budget usage",
       "input": {
         "type": "object",
@@ -491,8 +491,8 @@
       }
     },
 
-    "zen_get_metrics": {
-      "title": "zen_get_metrics",
+    "maestro_get_metrics": {
+      "title": "maestro_get_metrics",
       "description": "Get paper-aligned coordination metrics",
       "input": {
         "type": "object",
@@ -529,8 +529,8 @@
       }
     },
 
-    "zen_list_providers": {
-      "title": "zen_list_providers",
+    "maestro_list_providers": {
+      "title": "maestro_list_providers",
       "description": "List available CLI providers and their status",
       "input": {
         "type": "object",

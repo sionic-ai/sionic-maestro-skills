@@ -25,7 +25,7 @@ from enum import Enum
 from typing import Dict, Any, List, Optional, Callable, Tuple, Set
 import time
 
-logger = logging.getLogger("zen.consensus")
+logger = logging.getLogger("maestro.consensus")
 
 
 class VoteStatus(Enum):

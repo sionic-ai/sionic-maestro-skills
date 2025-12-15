@@ -39,7 +39,7 @@ Add regex-based masking before any external CLI call.
 
 ### Implementation
 
-#### 1. Add to `zen/config.py`
+#### 1. Add to `maestro/config.py`
 
 Following the existing pattern of nested dataclasses (`ProviderConfig`, `CoordinationPolicy`, etc.):
 
@@ -55,7 +55,7 @@ class MaskingConfig:
 
 
 @dataclass
-class ZenConfig:
+class MaestroConfig:
     # ... existing nested configs ...
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
     policy: CoordinationPolicy = field(default_factory=CoordinationPolicy)
@@ -66,11 +66,11 @@ class ZenConfig:
     masking: MaskingConfig = field(default_factory=MaskingConfig)
 
     @classmethod
-    def from_env(cls) -> "ZenConfig":
+    def from_env(cls) -> "MaestroConfig":
         # ... existing code ...
 
         # Parse MASK_REGEXES from env (comma-separated patterns)
-        mask_patterns_str = os.getenv("ZEN_MASK_REGEXES", "")
+        mask_patterns_str = os.getenv("MAESTRO_MASK_REGEXES", "")
         mask_regexes = []
         if mask_patterns_str:
             for pattern in mask_patterns_str.split(","):
@@ -98,7 +98,7 @@ class ZenConfig:
 
         masking = MaskingConfig(
             mask_regexes=mask_regexes,
-            mask_replacement=os.getenv("ZEN_MASK_REPLACEMENT", "***MASKED***"),
+            mask_replacement=os.getenv("MAESTRO_MASK_REPLACEMENT", "***MASKED***"),
         )
 
         return cls(
@@ -107,10 +107,10 @@ class ZenConfig:
         )
 ```
 
-#### 2. Add masking utility to `zen/providers.py`
+#### 2. Add masking utility to `maestro/providers.py`
 
 ```python
-def mask_secrets(text: str, config: ZenConfig) -> str:
+def mask_secrets(text: str, config: MaestroConfig) -> str:
     """Mask sensitive data in text before sending to external CLIs."""
     result = text
     for pattern in config.masking.mask_regexes:  # Use nested config
@@ -133,17 +133,17 @@ class CodexProvider(BaseProvider):
 
 ```bash
 # Custom patterns (comma-separated regexes)
-ZEN_MASK_REGEXES="my-secret-\d+,internal-token-[a-z]+"
+MAESTRO_MASK_REGEXES="my-secret-\d+,internal-token-[a-z]+"
 
 # Custom replacement text
-ZEN_MASK_REPLACEMENT="[REDACTED]"
+MAESTRO_MASK_REPLACEMENT="[REDACTED]"
 ```
 
 ### Testing
 
 ```python
 def test_mask_secrets():
-    config = ZenConfig(mask_regexes=[re.compile(r"sk-\w+")])
+    config = MaestroConfig(mask_regexes=[re.compile(r"sk-\w+")])
     text = "Use API key sk-abc123xyz"
     assert mask_secrets(text, config) == "Use API key ***MASKED***"
 
@@ -181,7 +181,7 @@ Add `jsonschema` dependency and use it for all schema validation.
 jsonschema>=4.17.0  # Required for Draft202012Validator
 ```
 
-#### 2. Add validation utility to `zen/selection.py`
+#### 2. Add validation utility to `maestro/selection.py`
 
 ```python
 from jsonschema import Draft202012Validator, ValidationError
@@ -204,7 +204,7 @@ def validate_json_schema(data: dict, schema: dict) -> tuple[bool, str]:
         return False, f"Schema validation error: {str(e)}"
 ```
 
-#### 3. Update `RedFlagger` in `zen/maker.py`
+#### 3. Update `RedFlagger` in `maestro/maker.py`
 
 ```python
 from jsonschema import Draft202012Validator, ValidationError
@@ -249,7 +249,7 @@ class RedFlagger:
 #### 4. Add schema validation to stage output checking
 
 ```python
-# In zen/workflow.py
+# In maestro/workflow.py
 def validate_stage_output(output: dict, stage: str) -> tuple[bool, str]:
     """Validate stage output against its schema."""
     schema = load_stage_schema(stage)
@@ -329,7 +329,7 @@ maestro-mcp/
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py              # Shared fixtures
-│   ├── test_config.py           # ZenConfig tests
+│   ├── test_config.py           # MaestroConfig tests
 │   ├── test_providers.py        # Provider tests (mocked CLIs)
 │   ├── test_selection.py        # Selection engine tests
 │   ├── test_coordination.py     # Architecture selection tests
@@ -368,7 +368,7 @@ testpaths = tests
 python_files = test_*.py
 python_functions = test_*
 asyncio_mode = auto
-addopts = -v --cov=zen --cov-report=term-missing
+addopts = -v --cov=maestro --cov-report=term-missing
 ```
 
 #### 3. `tests/conftest.py`
@@ -378,14 +378,14 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
 
-from zen.config import ZenConfig
-from zen.providers import ProviderRegistry
+from maestro.config import MaestroConfig
+from maestro.providers import ProviderRegistry
 
 
 @pytest.fixture
 def config():
     """Default test configuration."""
-    return ZenConfig(
+    return MaestroConfig(
         codex_cmd="echo",  # Mock with echo
         gemini_cmd="echo",
         claude_cmd="echo",
@@ -437,7 +437,7 @@ def temp_workspace(tmp_path):
 
 ```python
 import pytest
-from zen.maker import (
+from maestro.maker import (
     RedFlagger, RedFlaggerConfig, RedFlagReason,
     VoteStep, VoteResult,
     MicroStepType, MICRO_STEP_SPECS,
@@ -529,7 +529,7 @@ class TestVoteStep:
 
 class TestMicroStepSpecs:
     def test_all_stages_have_steps(self):
-        from zen.maker import StageType
+        from maestro.maker import StageType
 
         for stage in StageType:
             steps = [s for s in MICRO_STEP_SPECS.values() if s.stage == stage]
@@ -546,7 +546,7 @@ class TestMicroStepSpecs:
 
 ```python
 import pytest
-from zen.coordination import (
+from maestro.coordination import (
     ArchitectureSelectionEngine,
     TaskStructureFeatures,
     CoordinationTopology,
@@ -620,7 +620,7 @@ class TestTaskClassifier:
 pytest
 
 # Run with coverage
-pytest --cov=zen --cov-report=html
+pytest --cov=maestro --cov-report=html
 
 # Run specific test file
 pytest tests/test_maker.py
@@ -643,7 +643,7 @@ Add `git_state()` function similar to sionic-mcp.
 
 ### Implementation
 
-#### Add to `zen/workspace.py`
+#### Add to `maestro/workspace.py`
 
 ```python
 import subprocess
@@ -734,7 +734,7 @@ def git_state(cwd: Optional[Path] = None) -> Dict[str, Any]:
 
 ```python
 @mcp.tool()
-def zen_git_state(
+def maestro_git_state(
     path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -749,14 +749,14 @@ def zen_git_state(
     Returns:
         Git state dict or empty dict if not in a repo
     """
-    from zen.workspace import git_state
+    from maestro.workspace import git_state
     return git_state(Path(path) if path else None)
 ```
 
 #### Use in context packing
 
 ```python
-# In zen/context.py
+# In maestro/context.py
 def pack_context(self, ...) -> Dict[str, Any]:
     context = {
         "task": task,
@@ -790,11 +790,11 @@ Add artifact directory with JSONL logging per run.
 
 ### Implementation
 
-#### 1. Add to `zen/config.py`
+#### 1. Add to `maestro/config.py`
 
 ```python
 @dataclass
-class ZenConfig:
+class MaestroConfig:
     # ... existing fields ...
 
     # Artifacts
@@ -802,7 +802,7 @@ class ZenConfig:
     artifact_enabled: bool = True
 ```
 
-#### 2. Create `zen/artifacts.py`
+#### 2. Create `maestro/artifacts.py`
 
 ```python
 import json
@@ -942,13 +942,13 @@ class ArtifactStore:
 _active_runs: Dict[str, RunContext] = {}
 
 @mcp.tool()
-def zen_start_artifact_run(task: str) -> Dict[str, str]:
+def maestro_start_artifact_run(task: str) -> Dict[str, str]:
     """Start a new artifact run for the given task.
 
     Returns a run_id that should be passed to subsequent artifact operations.
     This design avoids race conditions when multiple runs happen concurrently.
     """
-    from zen.workspace import git_state
+    from maestro.workspace import git_state
     ctx = artifact_store.start_run(task, git_state())
     if ctx:
         _active_runs[ctx.run_id] = ctx
@@ -956,7 +956,7 @@ def zen_start_artifact_run(task: str) -> Dict[str, str]:
     return {"run_id": "", "enabled": False}
 
 @mcp.tool()
-def zen_save_stage_artifact(run_id: str, stage: str, result: Dict) -> Dict[str, bool]:
+def maestro_save_stage_artifact(run_id: str, stage: str, result: Dict) -> Dict[str, bool]:
     """Save stage result to an active artifact run."""
     ctx = _active_runs.get(run_id)
     if ctx:
@@ -965,7 +965,7 @@ def zen_save_stage_artifact(run_id: str, stage: str, result: Dict) -> Dict[str, 
     return {"success": False, "error": f"No active run: {run_id}"}
 
 @mcp.tool()
-def zen_end_artifact_run(run_id: str) -> Dict[str, str]:
+def maestro_end_artifact_run(run_id: str) -> Dict[str, str]:
     """End an artifact run and return the artifact directory."""
     ctx = _active_runs.pop(run_id, None)
     if ctx:
@@ -973,12 +973,12 @@ def zen_end_artifact_run(run_id: str) -> Dict[str, str]:
     return {"run_id": run_id, "error": "Run not found"}
 
 @mcp.tool()
-def zen_list_artifact_runs(limit: int = 10) -> List[Dict]:
+def maestro_list_artifact_runs(limit: int = 10) -> List[Dict]:
     """List recent artifact runs."""
     return artifact_store.list_runs(limit)
 
 @mcp.tool()
-def zen_load_artifact_run(run_id: str) -> Dict[str, Any]:
+def maestro_load_artifact_run(run_id: str) -> Dict[str, Any]:
     """Load all artifacts from a previous run."""
     return artifact_store.load_run(run_id)
 ```
@@ -986,8 +986,8 @@ def zen_load_artifact_run(run_id: str) -> Dict[str, Any]:
 ### Environment Variables
 
 ```bash
-ZEN_ARTIFACT_DIR=.maestro-artifacts
-ZEN_ARTIFACT_ENABLED=true
+MAESTRO_ARTIFACT_DIR=.maestro-artifacts
+MAESTRO_ARTIFACT_ENABLED=true
 ```
 
 ---
@@ -1010,7 +1010,7 @@ Consolidate into 3-4 core modules while preserving functionality.
 ```
 maestro-mcp/
 ├── server.py              # MCP tools (unchanged)
-└── zen/
+└── maestro/
     ├── __init__.py
     ├── core.py            # Config + Providers + Context (merged)
     ├── workflow.py        # Workflow + Selection + Verification (merged)
@@ -1023,11 +1023,11 @@ maestro-mcp/
 #### Phase 1: Merge `config.py` + `providers.py` → `core.py`
 
 ```python
-# zen/core.py
+# maestro/core.py
 
 # --- Config section ---
 @dataclass
-class ZenConfig:
+class MaestroConfig:
     # All config fields
     ...
 
@@ -1036,11 +1036,11 @@ def call_provider(
     provider: str,
     prompt: str,
     model: Optional[str] = None,
-    config: Optional[ZenConfig] = None,
+    config: Optional[MaestroConfig] = None,
     timeout: Optional[int] = None,
 ) -> ProviderResponse:
     """Universal provider caller (replaces 3 provider classes)."""
-    config = config or ZenConfig.from_env()
+    config = config or MaestroConfig.from_env()
 
     if provider == "codex":
         cmd = [config.codex_cmd, "exec", "--model", model or config.codex_model]
@@ -1070,7 +1070,7 @@ def pack_context(
 #### Phase 2: Merge `workflow.py` + `selection.py` + `verify.py` → `workflow.py`
 
 ```python
-# zen/workflow.py
+# maestro/workflow.py
 
 # --- Stage definitions ---
 STAGES = ["analyze", "hypothesize", "implement", "debug", "improve"]
@@ -1116,19 +1116,19 @@ These modules are well-structured and implement specific paper concepts.
 To avoid breaking external imports, add re-exports with warnings:
 
 ```python
-# zen/providers.py (DEPRECATED - keep for backwards compatibility)
+# maestro/providers.py (DEPRECATED - keep for backwards compatibility)
 import warnings
-from .core import call_provider, ProviderResponse, ZenConfig
+from .core import call_provider, ProviderResponse, MaestroConfig
 
 # Re-export for backwards compatibility
 __all__ = ["CodexProvider", "GeminiProvider", "ClaudeProvider", "ProviderRegistry"]
 
 class CodexProvider:
-    """DEPRECATED: Use zen.core.call_provider() instead."""
+    """DEPRECATED: Use maestro.core.call_provider() instead."""
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            "CodexProvider is deprecated. Use zen.core.call_provider('codex', ...) instead.",
+            "CodexProvider is deprecated. Use maestro.core.call_provider('codex', ...) instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1140,11 +1140,11 @@ class CodexProvider:
 
 
 class GeminiProvider:
-    """DEPRECATED: Use zen.core.call_provider() instead."""
+    """DEPRECATED: Use maestro.core.call_provider() instead."""
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            "GeminiProvider is deprecated. Use zen.core.call_provider('gemini', ...) instead.",
+            "GeminiProvider is deprecated. Use maestro.core.call_provider('gemini', ...) instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1156,7 +1156,7 @@ class GeminiProvider:
 # Similar for ClaudeProvider and ProviderRegistry...
 ```
 
-This allows existing code like `from zen.providers import CodexProvider` to continue
+This allows existing code like `from maestro.providers import CodexProvider` to continue
 working while emitting deprecation warnings, giving users time to migrate.
 
 ### Risk Mitigation
@@ -1191,7 +1191,7 @@ Tasks should be completed in this order (no time estimates - let users schedule)
 - [ ] All tests pass in CI
 
 ### P1 Complete
-- [ ] `zen_git_state` tool available and working
+- [ ] `maestro_git_state` tool available and working
 - [ ] Artifacts saved for each run
 - [ ] Can replay/audit previous runs
 
@@ -1205,7 +1205,7 @@ Tasks should be completed in this order (no time estimates - let users schedule)
 
 ## Appendix: Existing Code Fixes
 
-### Fix Deprecated `asyncio.get_event_loop()` in `zen/providers.py`
+### Fix Deprecated `asyncio.get_event_loop()` in `maestro/providers.py`
 
 Current code at line 193-198 uses deprecated `asyncio.get_event_loop()`:
 

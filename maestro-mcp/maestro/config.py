@@ -1,5 +1,5 @@
 """
-Configuration management for Zen Skills MCP.
+Configuration management for Maestro Skills MCP.
 Loads from environment variables with sensible defaults.
 """
 
@@ -52,15 +52,15 @@ class ContextConfig:
 class TracingConfig:
     """Configuration for tracing and metrics."""
     enabled: bool = True
-    trace_dir: str = ".zen-traces"
+    trace_dir: str = ".maestro-traces"
     log_level: str = "INFO"
     save_prompts: bool = True
     save_responses: bool = True
 
 
 @dataclass
-class ZenConfig:
-    """Master configuration for Zen Skills MCP."""
+class MaestroConfig:
+    """Master configuration for Maestro Skills MCP."""
 
     # Provider configurations
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
@@ -78,56 +78,56 @@ class ZenConfig:
     disabled_tools: List[str] = field(default_factory=list)
 
     @classmethod
-    def from_env(cls) -> "ZenConfig":
+    def from_env(cls) -> "MaestroConfig":
         """Load configuration from environment variables."""
 
         providers = {
             "codex": ProviderConfig(
-                cmd=os.getenv("ZEN_CODEX_CMD", "codex"),
-                default_model=os.getenv("ZEN_CODEX_MODEL", "gpt-5.2-xhigh"),
-                timeout_sec=int(os.getenv("ZEN_CODEX_TIMEOUT", "900")),
-                enabled=os.getenv("ZEN_CODEX_ENABLED", "true").lower() == "true",
+                cmd=os.getenv("MAESTRO_CODEX_CMD", "codex"),
+                default_model=os.getenv("MAESTRO_CODEX_MODEL", "gpt-5.2-xhigh"),
+                timeout_sec=int(os.getenv("MAESTRO_CODEX_TIMEOUT", "900")),
+                enabled=os.getenv("MAESTRO_CODEX_ENABLED", "true").lower() == "true",
             ),
             "gemini": ProviderConfig(
-                cmd=os.getenv("ZEN_GEMINI_CMD", "gemini"),
-                default_model=os.getenv("ZEN_GEMINI_MODEL", "gemini-3-pro-preview"),
-                timeout_sec=int(os.getenv("ZEN_GEMINI_TIMEOUT", "600")),
-                enabled=os.getenv("ZEN_GEMINI_ENABLED", "true").lower() == "true",
+                cmd=os.getenv("MAESTRO_GEMINI_CMD", "gemini"),
+                default_model=os.getenv("MAESTRO_GEMINI_MODEL", "gemini-3-pro-preview"),
+                timeout_sec=int(os.getenv("MAESTRO_GEMINI_TIMEOUT", "600")),
+                enabled=os.getenv("MAESTRO_GEMINI_ENABLED", "true").lower() == "true",
             ),
             "claude": ProviderConfig(
-                cmd=os.getenv("ZEN_CLAUDE_CMD", "claude"),
-                default_model=os.getenv("ZEN_CLAUDE_MODEL", "opus"),
-                timeout_sec=int(os.getenv("ZEN_CLAUDE_TIMEOUT", "600")),
-                enabled=os.getenv("ZEN_CLAUDE_ENABLED", "true").lower() == "true",
+                cmd=os.getenv("MAESTRO_CLAUDE_CMD", "claude"),
+                default_model=os.getenv("MAESTRO_CLAUDE_MODEL", "opus"),
+                timeout_sec=int(os.getenv("MAESTRO_CLAUDE_TIMEOUT", "600")),
+                enabled=os.getenv("MAESTRO_CLAUDE_ENABLED", "true").lower() == "true",
             ),
         }
 
         policy = CoordinationPolicy(
-            capability_threshold=float(os.getenv("ZEN_CAPABILITY_THRESHOLD", "0.45")),
-            max_consult_per_stage=int(os.getenv("ZEN_MAX_CONSULT_PER_STAGE", "2")),
-            max_consult_total=int(os.getenv("ZEN_MAX_CONSULT_TOTAL", "6")),
-            prefer_tests_first=os.getenv("ZEN_PREFER_TESTS_FIRST", "true").lower() == "true",
-            enable_ensemble_for_hypotheses=os.getenv("ZEN_ENSEMBLE_HYPOTHESES", "true").lower() == "true",
-            enable_ensemble_for_implementation=os.getenv("ZEN_ENSEMBLE_IMPL", "false").lower() == "true",
-            debug_loop_single_agent=os.getenv("ZEN_DEBUG_SINGLE_AGENT", "true").lower() == "true",
+            capability_threshold=float(os.getenv("MAESTRO_CAPABILITY_THRESHOLD", "0.45")),
+            max_consult_per_stage=int(os.getenv("MAESTRO_MAX_CONSULT_PER_STAGE", "2")),
+            max_consult_total=int(os.getenv("MAESTRO_MAX_CONSULT_TOTAL", "6")),
+            prefer_tests_first=os.getenv("MAESTRO_PREFER_TESTS_FIRST", "true").lower() == "true",
+            enable_ensemble_for_hypotheses=os.getenv("MAESTRO_ENSEMBLE_HYPOTHESES", "true").lower() == "true",
+            enable_ensemble_for_implementation=os.getenv("MAESTRO_ENSEMBLE_IMPL", "false").lower() == "true",
+            debug_loop_single_agent=os.getenv("MAESTRO_DEBUG_SINGLE_AGENT", "true").lower() == "true",
         )
 
         context = ContextConfig(
-            max_files=int(os.getenv("ZEN_CONTEXT_MAX_FILES", "7")),
-            max_lines_per_file=int(os.getenv("ZEN_CONTEXT_MAX_LINES", "200")),
-            max_error_lines=int(os.getenv("ZEN_CONTEXT_MAX_ERROR_LINES", "50")),
-            max_total_chars=int(os.getenv("ZEN_CONTEXT_MAX_CHARS", "40000")),
+            max_files=int(os.getenv("MAESTRO_CONTEXT_MAX_FILES", "7")),
+            max_lines_per_file=int(os.getenv("MAESTRO_CONTEXT_MAX_LINES", "200")),
+            max_error_lines=int(os.getenv("MAESTRO_CONTEXT_MAX_ERROR_LINES", "50")),
+            max_total_chars=int(os.getenv("MAESTRO_CONTEXT_MAX_CHARS", "40000")),
         )
 
         tracing = TracingConfig(
-            enabled=os.getenv("ZEN_TRACING_ENABLED", "true").lower() == "true",
-            trace_dir=os.getenv("ZEN_TRACE_DIR", ".zen-traces"),
-            log_level=os.getenv("ZEN_LOG_LEVEL", "INFO"),
+            enabled=os.getenv("MAESTRO_TRACING_ENABLED", "true").lower() == "true",
+            trace_dir=os.getenv("MAESTRO_TRACE_DIR", ".maestro-traces"),
+            log_level=os.getenv("MAESTRO_LOG_LEVEL", "INFO"),
         )
 
         disabled_tools = [
             t.strip()
-            for t in os.getenv("ZEN_DISABLED_TOOLS", "").split(",")
+            for t in os.getenv("MAESTRO_DISABLED_TOOLS", "").split(",")
             if t.strip()
         ]
 

@@ -22,7 +22,7 @@ Architecture: Centralized Consult Pattern
 
 __version__ = "0.5.0"  # Renamed to Maestro
 
-from .config import ZenConfig
+from .config import MaestroConfig
 from .providers import CodexProvider, GeminiProvider, ClaudeProvider, ProviderRegistry
 from .context import ContextPacker
 from .workflow import WorkflowEngine, Stage
@@ -50,7 +50,7 @@ from .coordination import (
 
 __all__ = [
     # Config
-    "ZenConfig",
+    "MaestroConfig",
     # Providers
     "CodexProvider",
     "GeminiProvider",
