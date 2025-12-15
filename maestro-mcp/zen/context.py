@@ -8,6 +8,10 @@ Strategy:
 - Stage-specific packing strategies (analyze=broad, implement=narrow)
 - Smart truncation that preserves important information
 - Error log summarization that keeps essential stack traces
+
+SECURITY:
+- All file reads are sandboxed to REPO_ROOTS if configured
+- Paths outside allowed roots are blocked to prevent data exfiltration
 """
 
 import os
@@ -15,10 +19,92 @@ import re
 import glob as glob_module
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from enum import Enum
+from pathlib import Path
 
 logger = logging.getLogger("zen.context")
+
+
+# =============================================================================
+# SECURITY: Repo-root sandboxing
+# =============================================================================
+
+# Configurable repo roots (can be set via environment)
+_REPO_ROOTS: Set[Path] = set()
+
+
+def configure_repo_roots(roots: List[str]) -> None:
+    """Configure allowed repository roots for file access."""
+    global _REPO_ROOTS
+    _REPO_ROOTS = {Path(r).resolve() for r in roots if r}
+    if _REPO_ROOTS:
+        logger.info(f"Context sandboxing enabled. Allowed roots: {_REPO_ROOTS}")
+
+
+def _init_repo_roots_from_env() -> None:
+    """Initialize repo roots from environment on module load."""
+    roots_str = os.getenv("ZEN_REPO_ROOTS", "")
+    if roots_str:
+        roots = [r.strip() for r in roots_str.split(":") if r.strip()]
+        configure_repo_roots(roots)
+
+
+def is_path_allowed(path: str) -> bool:
+    """
+    Check if a path is within allowed repo roots.
+
+    Security: Prevents reading arbitrary files like ~/.ssh/, ~/.config/, etc.
+
+    Args:
+        path: File path to check
+
+    Returns:
+        True if allowed (no sandbox, or path is within sandbox)
+    """
+    if not _REPO_ROOTS:
+        # No sandbox configured - allow all (for backwards compatibility)
+        # WARNING: This should be avoided in production
+        return True
+
+    try:
+        resolved = Path(path).resolve()
+        for root in _REPO_ROOTS:
+            try:
+                resolved.relative_to(root)
+                return True
+            except ValueError:
+                continue
+        return False
+    except Exception:
+        return False
+
+
+def _block_sensitive_paths(path: str) -> bool:
+    """
+    Block obviously sensitive paths even without sandbox.
+
+    This is a defense-in-depth measure.
+    """
+    sensitive_patterns = [
+        "/.ssh/",
+        "/.gnupg/",
+        "/.config/",
+        "/.aws/",
+        "/.kube/",
+        "/etc/passwd",
+        "/etc/shadow",
+        "/.env",
+        "/credentials",
+        "/secrets",
+        "/.git/config",  # May contain tokens
+    ]
+    path_lower = path.lower()
+    return any(p in path_lower for p in sensitive_patterns)
+
+
+# Initialize on module load
+_init_repo_roots_from_env()
 
 
 class TruncateStrategy(Enum):
@@ -80,6 +166,8 @@ class ContextPacker:
         """
         Read file with smart excerpting.
 
+        SECURITY: Paths are validated against repo roots and sensitive patterns.
+
         Args:
             path: File path
             max_lines: Maximum lines to include
@@ -87,6 +175,16 @@ class ContextPacker:
             end_line: Optional end line (1-indexed)
             include_line_numbers: Whether to prefix with line numbers
         """
+        # SECURITY: Block sensitive paths
+        if _block_sensitive_paths(path):
+            logger.warning(f"BLOCKED: Attempt to read sensitive path: {path}")
+            return f"[BLOCKED: Access to sensitive path denied: {path}]"
+
+        # SECURITY: Sandbox check
+        if not is_path_allowed(path):
+            logger.warning(f"BLOCKED: Path outside allowed roots: {path}")
+            return f"[BLOCKED: Path outside allowed repository roots: {path}]"
+
         if not os.path.exists(path):
             return f"[File not found: {path}]"
 

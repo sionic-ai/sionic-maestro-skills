@@ -127,6 +127,44 @@ ALLOWED_COMMAND_PREFIXES = [
     "git",  # For git-based checks
 ]
 
+# Security: Allowlist of safe Python modules for `python -m`
+# IMPORTANT: Do NOT add modules that can execute arbitrary code or network access
+ALLOWED_PYTHON_MODULES = [
+    "pytest",
+    "mypy",
+    "ruff",
+    "black",
+    "isort",
+    "flake8",
+    "pylint",
+    "coverage",
+    "unittest",
+    "doctest",
+    "py_compile",
+    "compileall",
+    "json.tool",  # JSON validation
+]
+
+# Explicitly blocked modules (dangerous even if someone adds them accidentally)
+BLOCKED_PYTHON_MODULES = [
+    "http.server",  # Can expose files
+    "pip",  # Can install arbitrary code
+    "ensurepip",
+    "venv",
+    "site",
+    "code",  # Interactive interpreter
+    "codeop",
+    "pdb",  # Debugger (can execute arbitrary code)
+    "idlelib",
+    "webbrowser",
+    "smtplib",
+    "ftplib",
+    "telnetlib",
+    "socketserver",
+    "SimpleHTTPServer",  # Python 2
+    "BaseHTTPServer",  # Python 2
+]
+
 
 class VerificationEngine:
     """
@@ -162,11 +200,22 @@ class VerificationEngine:
         # Check against allowlist
         for allowed in self.allowed_commands:
             if base_cmd == allowed or base_cmd.endswith(f"/{allowed}"):
-                return True, ""
+                # Special case: validate `python -m` module is allowed
+                if base_cmd in ["python", "python3"] and len(parts) > 2 and parts[1] == "-m":
+                    module = parts[2].split(".")[0]  # Get base module name
 
-        # Special case: allow `python -m` style commands
-        if base_cmd in ["python", "python3"] and len(parts) > 1 and parts[1] == "-m":
-            return True, ""
+                    # Check blocklist first
+                    if module in BLOCKED_PYTHON_MODULES or parts[2] in BLOCKED_PYTHON_MODULES:
+                        return False, f"Module '{parts[2]}' is blocked for security reasons"
+
+                    # Check allowlist
+                    if module not in ALLOWED_PYTHON_MODULES and parts[2] not in ALLOWED_PYTHON_MODULES:
+                        return False, (
+                            f"Module '{parts[2]}' not in allowed modules. "
+                            f"Allowed: {', '.join(ALLOWED_PYTHON_MODULES[:5])}..."
+                        )
+
+                return True, ""
 
         return False, f"Command '{base_cmd}' not in allowlist. Allowed: {', '.join(self.allowed_commands[:10])}..."
 

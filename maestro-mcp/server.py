@@ -152,7 +152,7 @@ config = ZenConfig.from_env()
 
 # Initialize MCP server
 mcp = FastMCP(
-    "zen-skills-mcp",
+    "maestro-mcp",
     description=(
         "Multi-LLM orchestration with measured coordination. "
         "Implements 5-stage workflow (Analyze→Hypothesize→Implement→Debug→Improve) "
@@ -202,10 +202,10 @@ def zen_consult(
     prompt: str,
     provider: Literal["codex", "gemini", "claude"] = "codex",
     model: Optional[str] = None,
-    context_files: List[str] = [],
-    context_facts: List[str] = [],
-    context_errors: List[str] = [],
-    context_constraints: List[str] = [],
+    context_files: Optional[List[str]] = None,
+    context_facts: Optional[List[str]] = None,
+    context_errors: Optional[List[str]] = None,
+    context_constraints: Optional[List[str]] = None,
     stage: Optional[str] = None,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
@@ -238,6 +238,12 @@ def zen_consult(
     Returns:
         Dictionary with 'ok', 'content', 'provider', 'model', 'elapsed_ms'.
     """
+    # Initialize mutable defaults (Python footgun: = [] is shared between calls)
+    context_files = context_files or []
+    context_facts = context_facts or []
+    context_errors = context_errors or []
+    context_constraints = context_constraints or []
+
     # Check if provider is enabled
     if provider not in registry.list_providers():
         return {
@@ -303,10 +309,10 @@ def zen_consult(
 @mcp.tool()
 def zen_ensemble_generate(
     task: str,
-    providers: List[str] = ["codex", "gemini"],
-    context_files: List[str] = [],
-    context_facts: List[str] = [],
-    context_errors: List[str] = [],
+    providers: Optional[List[str]] = None,
+    context_files: Optional[List[str]] = None,
+    context_facts: Optional[List[str]] = None,
+    context_errors: Optional[List[str]] = None,
     n_per_provider: int = 1,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
@@ -337,6 +343,12 @@ def zen_ensemble_generate(
     Returns:
         Dictionary with 'candidates' list, each having id, provider, content.
     """
+    # Initialize mutable defaults
+    providers = providers or ["codex", "gemini"]
+    context_files = context_files or []
+    context_facts = context_facts or []
+    context_errors = context_errors or []
+
     # Check capability saturation
     if not workflow_engine.should_use_ensemble(Stage.HYPOTHESIZE):
         return {
@@ -541,10 +553,10 @@ def zen_select_best(
 
 @mcp.tool()
 def zen_pack_context(
-    files: List[str] = [],
-    facts: List[str] = [],
-    errors: List[str] = [],
-    constraints: List[str] = [],
+    files: Optional[List[str]] = None,
+    facts: Optional[List[str]] = None,
+    errors: Optional[List[str]] = None,
+    constraints: Optional[List[str]] = None,
     stage: Optional[str] = None,
     max_chars: int = 40000,
 ) -> Dict[str, Any]:
@@ -572,6 +584,12 @@ def zen_pack_context(
     Returns:
         Dictionary with 'packed_context', 'stats'.
     """
+    # Initialize mutable defaults
+    files = files or []
+    facts = facts or []
+    errors = errors or []
+    constraints = constraints or []
+
     if stage:
         packed = ContextPacker.for_stage(
             stage=stage,
@@ -634,9 +652,9 @@ def zen_workflow_state() -> Dict[str, Any]:
 def zen_run_stage(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
     task: str,
-    context_files: List[str] = [],
-    context_facts: List[str] = [],
-    context_errors: List[str] = [],
+    context_files: Optional[List[str]] = None,
+    context_facts: Optional[List[str]] = None,
+    context_errors: Optional[List[str]] = None,
     providers: Optional[List[str]] = None,
     baseline_confidence: float = 0.0,
 ) -> Dict[str, Any]:
@@ -667,6 +685,11 @@ def zen_run_stage(
     Returns:
         Stage result with output and next stage recommendation.
     """
+    # Initialize mutable defaults
+    context_files = context_files or []
+    context_facts = context_facts or []
+    context_errors = context_errors or []
+
     # Map string to Stage enum
     stage_enum = {
         "analyze": Stage.ANALYZE,
@@ -964,9 +987,9 @@ def zen_consult_with_role(
         "judge",
     ],
     provider: Literal["codex", "gemini", "claude"] = "codex",
-    context_files: List[str] = [],
-    context_facts: List[str] = [],
-    context_errors: List[str] = [],
+    context_files: Optional[List[str]] = None,
+    context_facts: Optional[List[str]] = None,
+    context_errors: Optional[List[str]] = None,
     stage: Optional[str] = None,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
@@ -997,6 +1020,11 @@ def zen_consult_with_role(
     Returns:
         Dictionary with response and metadata.
     """
+    # Initialize mutable defaults
+    context_files = context_files or []
+    context_facts = context_facts or []
+    context_errors = context_errors or []
+
     # Load role prompt
     role_prompt = load_role_prompt(role)
 
@@ -1342,8 +1370,8 @@ def zen_validate_content(
     content: str,
     content_type: Literal["general", "diff", "json"] = "general",
     max_chars: int = 15000,
-    require_json_fields: List[str] = [],
-    forbidden_patterns: List[str] = [],
+    require_json_fields: Optional[List[str]] = None,
+    forbidden_patterns: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Validate content against MAKER-style red-flag criteria.
@@ -1368,6 +1396,10 @@ def zen_validate_content(
     Returns:
         Validation result with is_valid and reason if invalid.
     """
+    # Initialize mutable defaults
+    require_json_fields = require_json_fields or []
+    forbidden_patterns = forbidden_patterns or []
+
     red_flag_config = RedFlagConfig(
         max_chars=max_chars,
         require_json=content_type == "json",
@@ -1404,7 +1436,7 @@ def zen_log_evidence(
     content: Dict[str, Any],
     source: str,
     confidence: float = 1.0,
-    linked_evidence_ids: List[str] = [],
+    linked_evidence_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Log evidence to the reasoning chain for auditability.
@@ -1429,6 +1461,9 @@ def zen_log_evidence(
     Returns:
         The evidence ID for future reference.
     """
+    # Initialize mutable defaults
+    linked_evidence_ids = linked_evidence_ids or []
+
     type_map = {
         "observation": EvidenceType.OBSERVATION,
         "hypothesis": EvidenceType.HYPOTHESIS,

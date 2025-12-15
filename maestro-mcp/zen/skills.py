@@ -9,6 +9,26 @@ Architecture:
 2. SkillLoader - Loads skill definitions on-demand
 3. DynamicToolRegistry - Manages which tools are exposed
 4. SkillSession - Tracks current skill context and loaded tools
+
+IMPORTANT LIMITATION (2025-01):
+==================================
+The current implementation provides a CONCEPTUAL registry of tools and their
+context costs, but does NOT actually wire into FastMCP's tool add/remove APIs.
+
+Tools are still registered via @mcp.tool() decorators at startup, meaning
+MCP clients see the FULL tool list regardless of the current skill/stage.
+
+To fully implement dynamic tool loading, you would need to:
+1. Use FastMCP's dynamic tool registration (if supported)
+2. OR implement tool visibility filtering at the MCP protocol level
+3. OR use multiple MCP server instances with different tool sets
+
+The current registry is useful for:
+- Tracking which tools SHOULD be loaded (for documentation)
+- Computing context cost estimates
+- Planning which tools to expose in future implementations
+
+This is tracked as a known issue in CRITICAL_ANALYSIS.md.
 """
 
 import os

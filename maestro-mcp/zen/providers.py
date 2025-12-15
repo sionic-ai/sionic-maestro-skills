@@ -20,8 +20,107 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from concurrent.futures import ThreadPoolExecutor
+import re
 
 logger = logging.getLogger("zen.providers")
+
+# Shared executor for async operations (avoids creating new executor per call)
+_SHARED_EXECUTOR: Optional[ThreadPoolExecutor] = None
+
+
+def _get_shared_executor() -> ThreadPoolExecutor:
+    """Get or create the shared thread pool executor."""
+    global _SHARED_EXECUTOR
+    if _SHARED_EXECUTOR is None:
+        _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+    return _SHARED_EXECUTOR
+
+
+def _extract_json_from_output(text: str) -> Optional[Dict[str, Any]]:
+    """
+    Extract JSON from CLI output that may contain prose/logs around it.
+
+    CLIs often print logs or messages before/after JSON output.
+    This function tries multiple strategies to find valid JSON.
+    """
+    text = text.strip()
+
+    # Strategy 1: Try the whole thing (fastest path)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Find JSON object boundaries { ... }
+    # Look for the outermost JSON object
+    brace_start = text.find('{')
+    if brace_start != -1:
+        # Find matching closing brace
+        depth = 0
+        in_string = False
+        escape_next = False
+        for i, char in enumerate(text[brace_start:], brace_start):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\':
+                escape_next = True
+                continue
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = text[brace_start:i + 1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+
+    # Strategy 3: Find JSON array boundaries [ ... ]
+    bracket_start = text.find('[')
+    if bracket_start != -1:
+        depth = 0
+        in_string = False
+        escape_next = False
+        for i, char in enumerate(text[bracket_start:], bracket_start):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\':
+                escape_next = True
+                continue
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char == '[':
+                depth += 1
+            elif char == ']':
+                depth -= 1
+                if depth == 0:
+                    candidate = text[bracket_start:i + 1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+
+    # Strategy 4: Try each line (some CLIs output JSON on a single line)
+    for line in text.split('\n'):
+        line = line.strip()
+        if line.startswith(('{', '[')):
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+    return None
 
 
 @dataclass
@@ -129,13 +228,10 @@ class CLIProvider(ABC):
                 stdout = stdout[: self.max_output_chars] + "\n... [OUTPUT TRUNCATED]"
                 truncated = True
 
-            # Try to parse structured output
+            # Try to parse structured output (using smart extraction)
             structured = None
             if output_schema:
-                try:
-                    structured = json.loads(stdout.strip())
-                except json.JSONDecodeError:
-                    pass
+                structured = _extract_json_from_output(stdout)
 
             return ProviderResponse(
                 ok=result.returncode == 0,
@@ -189,13 +285,13 @@ class CLIProvider(ABC):
         output_schema: Optional[Dict[str, Any]] = None,
         cwd: Optional[str] = None,
     ) -> ProviderResponse:
-        """Execute the CLI command asynchronously using thread pool."""
+        """Execute the CLI command asynchronously using shared thread pool."""
         loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            return await loop.run_in_executor(
-                executor,
-                lambda: self.run(prompt, model, timeout_sec, output_schema, cwd),
-            )
+        # Use shared executor instead of creating new one per call
+        return await loop.run_in_executor(
+            _get_shared_executor(),
+            lambda: self.run(prompt, model, timeout_sec, output_schema, cwd),
+        )
 
     def _inject_schema_arg(self, cmd: List[str], schema_path: str) -> List[str]:
         """Override in subclasses to inject schema argument."""
@@ -292,7 +388,7 @@ class ProviderRegistry:
 
     def __init__(self):
         self.providers: Dict[str, CLIProvider] = {}
-        self._executor = ThreadPoolExecutor(max_workers=4)
+        # Note: Providers use the module-level shared executor (_get_shared_executor)
 
     def register(self, name: str, provider: CLIProvider) -> None:
         """Register a provider."""
