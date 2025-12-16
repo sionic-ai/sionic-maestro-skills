@@ -22,14 +22,15 @@ all: install
 help:
 	@echo "$(GREEN)Maestro Skills - Available Commands$(NC)"
 	@echo ""
-	@echo "  $(YELLOW)make install$(NC)     - Set up venv with Python $(PYTHON_VERSION) and install deps"
-	@echo "  $(YELLOW)make reinstall$(NC)   - Clean and reinstall everything"
-	@echo "  $(YELLOW)make clean$(NC)       - Remove venv and cache files"
-	@echo "  $(YELLOW)make test$(NC)        - Run tests"
-	@echo "  $(YELLOW)make run$(NC)         - Start the MCP server"
-	@echo "  $(YELLOW)make check$(NC)       - Verify installation"
-	@echo "  $(YELLOW)make lint$(NC)        - Run linter (ruff)"
-	@echo "  $(YELLOW)make verify$(NC)      - Verify all CLI tools are available"
+	@echo "  $(YELLOW)make install$(NC)    - Install deps + configure globally for Claude Code"
+	@echo "  $(YELLOW)make reinstall$(NC)  - Clean and reinstall everything"
+	@echo "  $(YELLOW)make clean$(NC)      - Remove venv and cache files"
+	@echo "  $(YELLOW)make test$(NC)       - Run tests"
+	@echo "  $(YELLOW)make run$(NC)        - Start the MCP server"
+	@echo "  $(YELLOW)make check$(NC)      - Verify installation"
+	@echo "  $(YELLOW)make lint$(NC)       - Run linter (ruff)"
+	@echo "  $(YELLOW)make verify$(NC)     - Verify all CLI tools are available"
+	@echo "  $(YELLOW)make mcp-config$(NC) - Show MCP config (for manual setup)"
 	@echo ""
 
 # Check if uv is installed
@@ -53,27 +54,53 @@ deps: venv
 	@$(UV) pip install -r requirements.txt
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
-# Main install target
+# Main install target (includes global MCP configuration)
 install: deps
 	@echo ""
+	@echo "$(YELLOW)Configuring global MCP server...$(NC)"
+	@mkdir -p ~/.claude
+	@if [ -f ~/.claude/mcp.json ]; then \
+		if grep -q "maestro-mcp" ~/.claude/mcp.json; then \
+			echo "$(YELLOW)maestro-mcp already in ~/.claude/mcp.json, updating...$(NC)"; \
+			$(PYTHON) -c "import json; \
+				f=open('$(HOME)/.claude/mcp.json','r'); \
+				d=json.load(f); f.close(); \
+				d.setdefault('mcpServers',{})['maestro-mcp']={'command':'$(shell pwd)/$(VENV)/bin/python','args':['$(shell pwd)/server.py']}; \
+				f=open('$(HOME)/.claude/mcp.json','w'); \
+				json.dump(d,f,indent=2); f.close()"; \
+		else \
+			echo "$(YELLOW)Adding maestro-mcp to existing ~/.claude/mcp.json...$(NC)"; \
+			$(PYTHON) -c "import json; \
+				f=open('$(HOME)/.claude/mcp.json','r'); \
+				d=json.load(f); f.close(); \
+				d.setdefault('mcpServers',{})['maestro-mcp']={'command':'$(shell pwd)/$(VENV)/bin/python','args':['$(shell pwd)/server.py']}; \
+				f=open('$(HOME)/.claude/mcp.json','w'); \
+				json.dump(d,f,indent=2); f.close()"; \
+		fi \
+	else \
+		echo "$(YELLOW)Creating ~/.claude/mcp.json...$(NC)"; \
+		echo '{"mcpServers":{"maestro-mcp":{"command":"$(shell pwd)/$(VENV)/bin/python","args":["$(shell pwd)/server.py"]}}}' | $(PYTHON) -m json.tool > ~/.claude/mcp.json; \
+	fi
+	@echo "$(GREEN)✓ Global MCP config updated$(NC)"
+	@echo ""
 	@echo "$(GREEN)============================================$(NC)"
-	@echo "$(GREEN)  Maestro Skills installed successfully!$(NC)"
+	@echo "$(GREEN)  Maestro Skills installed globally!$(NC)"
 	@echo "$(GREEN)============================================$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Next steps:$(NC)"
-	@echo "  1. Activate venv: source $(VENV)/bin/activate"
-	@echo "  2. Verify setup:  make check"
-	@echo "  3. Run server:    make run"
+	@echo "$(YELLOW)Maestro is now available in ALL Claude Code sessions.$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Or add to Claude Code MCP config:$(NC)"
-	@echo '  {'
-	@echo '    "mcpServers": {'
-	@echo '      "maestro-mcp": {'
-	@echo '        "command": "$(shell pwd)/$(VENV)/bin/python",'
-	@echo '        "args": ["$(shell pwd)/server.py"]'
-	@echo '      }'
-	@echo '    }'
-	@echo '  }'
+	@echo "$(YELLOW)To use:$(NC)"
+	@echo "  1. Restart Claude Code (or start a new session)"
+	@echo "  2. Type: /mcp  (should show maestro-mcp running)"
+	@echo "  3. Say: \"Use maestro to debug this bug\""
+	@echo ""
+	@echo "$(YELLOW)Slash commands:$(NC)"
+	@echo "  /maestro-debug <task>    - Debug with HITL workflow"
+	@echo "  /maestro-analyze <task>  - Analyze only"
+	@echo "  /maestro-consult <query> - Ask another LLM"
+	@echo ""
+	@echo "$(YELLOW)Verify installation:$(NC)"
+	@echo "  make check"
 	@echo ""
 
 # Clean up

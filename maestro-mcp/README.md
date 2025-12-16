@@ -60,25 +60,32 @@ This project implements "measured coordination" - using multiple LLMs strategica
 
 ### Quick Install (Recommended)
 
-Using `make` with `uv` (fastest):
-
 ```bash
 cd maestro-mcp
 make install
 ```
 
-This will:
-- Create a virtual environment with Python 3.11
-- Install all dependencies using `uv`
-- Show next steps for configuration
+This single command will:
+1. Create a virtual environment with Python 3.11
+2. Install all dependencies using `uv`
+3. **Configure globally** in `~/.claude/mcp.json`
+4. Make Maestro available in **all** Claude Code sessions
 
-Other useful commands:
+After installation, restart Claude Code and verify:
+```bash
+# In Claude Code
+/mcp
+# Should show: ✓ maestro-mcp (running)
+```
+
+### Other Commands
+
 ```bash
 make help        # Show all available commands
 make check       # Verify installation
 make verify      # Check if CLI tools are available
-make run         # Start the MCP server
-make mcp-config  # Generate MCP config for Claude Code
+make run         # Start the MCP server manually
+make mcp-config  # Show MCP config (for manual setup)
 make clean       # Remove venv and cache
 make reinstall   # Clean and reinstall
 ```
@@ -147,34 +154,10 @@ gemini --version
 claude --version
 ```
 
-### Step 4: Configure MCP Server
+### Step 4: Verify Installation
 
-The `.mcp.json` file should be in your project root:
-
-```json
-{
-  "mcpServers": {
-    "maestro-mcp": {
-      "command": "python3",
-      "args": ["maestro-mcp/server.py"]
-    }
-  }
-}
-```
-
-For global installation, add to `~/.claude/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "maestro-mcp": {
-      "command": "/path/to/maestro-mcp/.venv/bin/python",
-      "args": ["/path/to/maestro-mcp/server.py"]
-    }
-  }
-}
-```
-
-### Step 5: Verify Installation
+> **Note**: `make install` automatically configures the global MCP server.
+> For manual configuration, run `make mcp-config` to see the JSON config.
 
 ```bash
 # Start Claude Code
@@ -249,7 +232,46 @@ cd maestro-mcp && python -c "import server; print('OK')"
 export MAESTRO_CODEX_TIMEOUT=1800  # 30 minutes
 ```
 
-## Available Tools (34 Total)
+## How to Use Maestro Skills
+
+Maestro Skills is **not automatically invoked**. You must explicitly request it.
+
+### Method 1: Keyword Triggers
+
+Include these keywords in your request:
+
+| Keyword | Example |
+|---------|---------|
+| `maestro` | "Use **maestro** to debug this bug" |
+| `multi-llm` | "Get **multi-llm** opinions on this code" |
+| `HITL` / `approval` | "Debug with **HITL** approval at each step" |
+| `workflow` | "Run the full **workflow** on this task" |
+
+### Method 2: Slash Commands
+
+```
+/maestro-debug <description>     Debug with full HITL workflow
+/maestro-analyze <description>   Analyze code/issue only
+/maestro-consult <question>      Ask another LLM
+/maestro-workflow <description>  Run complete 5-stage workflow
+```
+
+**Examples**:
+```
+/maestro-debug Fix the login bug in auth.py
+/maestro-analyze Review the payment processing code
+/maestro-consult What's the best way to handle this error?
+/maestro-workflow Implement user session management
+```
+
+### Method 3: Direct Tool Calls
+
+```
+"Call maestro_workflow_with_hitl to start debugging"
+"Use maestro_consult with codex to get a second opinion"
+```
+
+## Available Tools (41 Total)
 
 ### Core Consultation Tools
 
