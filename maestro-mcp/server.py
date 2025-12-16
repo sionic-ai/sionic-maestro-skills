@@ -67,6 +67,12 @@ from maestro.coordination import (
     compute_redundancy, estimate_error_amplification,
 )
 
+# Human-in-the-Loop module
+from maestro.human_loop import (
+    HumanLoopManager, ApprovalRequest, ApprovalStatus, StageReport,
+    ReviewQuestion, ReviewPriority, format_approval_request_for_display,
+)
+
 
 # ============================================================================
 # Configuration Loading (cli_clients.yaml, roles, skills, schemas)
@@ -140,6 +146,39 @@ def load_output_schema(schema_name: str) -> Dict[str, Any]:
 # Load CLI clients configuration
 CLI_CONFIG = load_yaml_config(BASE_DIR / "conf" / "cli_clients.yaml")
 
+# Load SKILLS.md for on-demand documentation
+SKILLS_MD_PATH = BASE_DIR / "SKILLS.md"
+SKILLS_MD_CONTENT = SKILLS_MD_PATH.read_text() if SKILLS_MD_PATH.exists() else ""
+
+
+def parse_skills_md(content: str) -> Dict[str, str]:
+    """Parse SKILLS.md into topic -> content sections."""
+    sections = {}
+    current_topic = None
+    current_content = []
+
+    for line in content.split("\n"):
+        # Match "## Tool: name" or "## Topic: name"
+        if line.startswith("## Tool: ") or line.startswith("## Topic: "):
+            if current_topic:
+                sections[current_topic] = "\n".join(current_content).strip()
+            current_topic = line.split(": ", 1)[1].strip()
+            current_content = [line]
+        elif line.startswith("---") and current_topic:
+            sections[current_topic] = "\n".join(current_content).strip()
+            current_topic = None
+            current_content = []
+        elif current_topic:
+            current_content.append(line)
+
+    if current_topic:
+        sections[current_topic] = "\n".join(current_content).strip()
+
+    return sections
+
+
+SKILLS_SECTIONS = parse_skills_md(SKILLS_MD_CONTENT)
+
 # Configure logging
 logging.basicConfig(
     level=os.getenv("MAESTRO_LOG_LEVEL", "INFO"),
@@ -153,7 +192,7 @@ config = MaestroConfig.from_env()
 # Initialize MCP server
 mcp = FastMCP(
     "maestro-mcp",
-    description=(
+    instructions=(
         "Multi-LLM orchestration with measured coordination. "
         "Implements 5-stage workflow (Analyze→Hypothesize→Implement→Debug→Improve) "
         "with Poetiq-style ensemble selection. Based on 'Towards a Science of Scaling Agent Systems'."
@@ -192,6 +231,48 @@ architecture_engine = ArchitectureSelectionEngine(
 task_classifier = TaskStructureClassifier()
 degradation_strategy = DegradationStrategy()
 
+# Initialize Human-in-the-Loop manager
+human_loop_manager = HumanLoopManager()
+
+
+# ============================================================================
+# TOOL: maestro_help - On-demand documentation (token-efficient)
+# ============================================================================
+
+@mcp.tool()
+def maestro_help(
+    topic: str,
+) -> Dict[str, Any]:
+    """Get detailed guidance for any maestro tool or topic. Call this before using unfamiliar tools."""
+    # Normalize topic name
+    topic_normalized = topic.lower().replace("maestro_", "").strip()
+
+    # Check exact match first
+    if topic in SKILLS_SECTIONS:
+        return {
+            "ok": True,
+            "topic": topic,
+            "content": SKILLS_SECTIONS[topic],
+        }
+
+    # Check normalized match
+    for key in SKILLS_SECTIONS:
+        if key.lower().replace("maestro_", "") == topic_normalized:
+            return {
+                "ok": True,
+                "topic": key,
+                "content": SKILLS_SECTIONS[key],
+            }
+
+    # List available topics
+    available = sorted(SKILLS_SECTIONS.keys())
+    return {
+        "ok": False,
+        "error": f"Topic '{topic}' not found",
+        "available_topics": available,
+        "hint": "Try tool names like 'maestro_consult' or topics like 'workflow', 'paper_insights'",
+    }
+
 
 # ============================================================================
 # TOOL: maestro_consult - Single provider consultation
@@ -209,35 +290,7 @@ def maestro_consult(
     stage: Optional[str] = None,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
-    """
-    Consult an external LLM CLI as a 'sub-agent'.
-
-    Use for:
-    - Example Analysis: Understanding code structure, summarizing logs
-    - Hypothesis Generation: Getting diverse perspectives on root causes
-    - Code Review: Safety, security, and maintainability checks
-    - Improvement Suggestions: Refactoring ideas
-
-    DO NOT use for:
-    - Direct file editing (orchestrator should edit)
-    - Running tests or commands (orchestrator should run)
-
-    Paper Insight: "Tool-coordination trade-off" - limit consults in tool-heavy stages.
-
-    Args:
-        prompt: The specific question or task for the consultant.
-        provider: Which CLI to use ('codex', 'gemini', 'claude').
-        model: Specific model (uses default if not specified).
-        context_files: File paths to include in context.
-        context_facts: Established facts about the problem.
-        context_errors: Error logs or stack traces.
-        context_constraints: Requirements that must not be violated.
-        stage: Current workflow stage (for context-aware packing).
-        timeout_sec: Timeout for the CLI call.
-
-    Returns:
-        Dictionary with 'ok', 'content', 'provider', 'model', 'elapsed_ms'.
-    """
+    """Consult external LLM CLI as sub-agent. Call maestro_help('maestro_consult') for details."""
     # Initialize mutable defaults (Python footgun: = [] is shared between calls)
     context_files = context_files or []
     context_facts = context_facts or []
@@ -316,33 +369,7 @@ def maestro_ensemble_generate(
     n_per_provider: int = 1,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
-    """
-    Generate multiple candidate solutions using different LLMs.
-
-    Paper Insight: "Independent agents allow diverse exploration"
-    but "error amplification" means we MUST verify before accepting.
-
-    Use for:
-    - Hypothesis generation (get diverse root cause theories)
-    - Solution exploration (multiple approaches to a problem)
-    - Review collection (different perspectives on code quality)
-
-    DO NOT use for:
-    - Implementation (creates merge conflicts)
-    - Sequential debugging (paper shows MAS degrades here)
-
-    Args:
-        task: The task to generate candidates for.
-        providers: List of providers to use (default: codex, gemini).
-        context_files: Files to include in context.
-        context_facts: Known facts.
-        context_errors: Error logs.
-        n_per_provider: Number of candidates per provider.
-        timeout_sec: Timeout per provider.
-
-    Returns:
-        Dictionary with 'candidates' list, each having id, provider, content.
-    """
+    """Generate multiple candidates using different LLMs. Call maestro_help('maestro_ensemble_generate') for details."""
     # Initialize mutable defaults
     providers = providers or ["codex", "gemini"]
     context_files = context_files or []
@@ -444,29 +471,7 @@ def maestro_select_best(
     judge_provider: Literal["claude", "codex", "gemini"] = "claude",
     criteria: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Select the best candidate from ensemble output.
-
-    Paper Insight: "Centralized verification prevents error amplification."
-    Independent agents amplify errors 17.2x without verification!
-
-    Selection Priority (tests_first mode - RECOMMENDED):
-    1. Automated tests (pytest, npm test) - HIGHEST PRIORITY
-    2. Static analysis (lint scores)
-    3. LLM Judge evaluation
-    4. Provider trust scores
-
-    Args:
-        candidates: List of candidates from maestro_ensemble_generate.
-        mode: Selection strategy ('tests_first', 'llm_judge', 'hybrid').
-        test_results: Optional test results [{candidate_id, passed, output}].
-        lint_results: Optional lint results [{candidate_id, score, output}].
-        judge_provider: Which LLM to use for judging.
-        criteria: Evaluation criteria for LLM judge.
-
-    Returns:
-        Dictionary with winner_id, winner, rationale, scores.
-    """
+    """Select best candidate from ensemble. Call maestro_help('maestro_select_best') for details."""
     # Initialize mutable defaults
     criteria = criteria or ["correctness", "safety", "completeness"]
 
@@ -563,30 +568,7 @@ def maestro_pack_context(
     stage: Optional[str] = None,
     max_chars: int = 40000,
 ) -> Dict[str, Any]:
-    """
-    Pack context for sub-agent calls with smart truncation.
-
-    Paper Insight: "Information fragmentation increases coordination tax."
-    This tool minimizes overhead by smart excerpting and prioritization.
-
-    Stage-specific strategies:
-    - analyze: Broad context, more files
-    - hypothesize: Focused on errors and facts
-    - implement: Narrow, specific files only
-    - debug: Error-heavy, recent changes
-    - improve: Full context for review
-
-    Args:
-        files: File paths (supports globs like 'src/*.py').
-        facts: Known facts about the problem.
-        errors: Error logs or stack traces.
-        constraints: Requirements that must not be violated.
-        stage: Current workflow stage for optimized packing.
-        max_chars: Maximum context characters.
-
-    Returns:
-        Dictionary with 'packed_context', 'stats'.
-    """
+    """Pack context with smart truncation. Call maestro_help('maestro_pack_context') for details."""
     # Initialize mutable defaults
     files = files or []
     facts = facts or []
@@ -624,18 +606,7 @@ def maestro_pack_context(
 
 @mcp.tool()
 def maestro_workflow_state() -> Dict[str, Any]:
-    """
-    Get the current workflow state and metrics.
-
-    Shows:
-    - Current stage
-    - Consult budget used/remaining
-    - Stage history
-    - Paper-aligned metrics (overhead, efficiency)
-
-    Returns:
-        Dictionary with workflow state and metrics.
-    """
+    """Get current workflow state and metrics. Call maestro_help('maestro_workflow_state') for details."""
     state = workflow_engine.get_workflow_state()
     metrics = Metrics.compute(trace_store)
 
@@ -661,33 +632,7 @@ def maestro_run_stage(
     providers: Optional[List[str]] = None,
     baseline_confidence: float = 0.0,
 ) -> Dict[str, Any]:
-    """
-    Execute a single stage of the 5-stage workflow.
-
-    Stages:
-    1. analyze: Freeze facts before guessing
-    2. hypothesize: Generate competing explanations
-    3. implement: Apply changes safely (single agent preferred)
-    4. debug: Fix without divergence (single agent preferred)
-    5. improve: Refactor and stabilize
-
-    Paper Insights Applied:
-    - Tool-heavy stages (implement, debug) use single agent
-    - Capability saturation: Skip ensemble if baseline > 45%
-    - Error amplification: All outputs need verification
-
-    Args:
-        stage: Which stage to run.
-        task: The task description.
-        context_files: Relevant files.
-        context_facts: Known facts.
-        context_errors: Error logs.
-        providers: Override default providers for this stage.
-        baseline_confidence: Your confidence level (0.0-1.0).
-
-    Returns:
-        Stage result with output and next stage recommendation.
-    """
+    """Execute a workflow stage. Call maestro_help('maestro_run_stage') for details."""
     # Initialize mutable defaults
     context_files = context_files or []
     context_facts = context_facts or []
@@ -759,22 +704,7 @@ def maestro_run_stage(
 
 @mcp.tool()
 def maestro_get_metrics() -> Dict[str, Any]:
-    """
-    Get detailed metrics aligned with the paper.
-
-    Paper Metrics:
-    - Coordination Overhead (O%): Extra turns vs single-agent
-    - Efficiency Score (Ec): Success rate / relative overhead
-    - Consults per Stage: Average sub-agent calls per stage
-
-    Use to:
-    - Monitor coordination costs
-    - Identify when to reduce/increase collaboration
-    - Compare against paper benchmarks
-
-    Returns:
-        Detailed metrics dictionary.
-    """
+    """Get detailed paper-aligned metrics. Call maestro_help('maestro_get_metrics') for details."""
     metrics = Metrics.compute(trace_store)
     return {
         "ok": True,
@@ -789,12 +719,7 @@ def maestro_get_metrics() -> Dict[str, Any]:
 
 @mcp.tool()
 def maestro_list_providers() -> Dict[str, Any]:
-    """
-    List available CLI providers and their status.
-
-    Returns:
-        Dictionary with provider names and configurations.
-    """
+    """List available CLI providers. Call maestro_help('maestro_list_providers') for details."""
     providers = {}
     for name in registry.list_providers():
         provider = registry.get(name)
@@ -821,25 +746,7 @@ def maestro_list_providers() -> Dict[str, Any]:
 def maestro_get_skill(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
-    """
-    Get the skill definition and guidance for a workflow stage.
-
-    Each stage has a detailed skill definition with:
-    - Goal and purpose
-    - Process steps
-    - Output schema (JSON format)
-    - Coordination policy (when to use ensemble)
-    - Anti-patterns to avoid
-    - Exit criteria
-
-    Use this to understand how to execute a stage properly.
-
-    Args:
-        stage: Which stage's skill to retrieve.
-
-    Returns:
-        Skill definition with metadata, content, and output schema.
-    """
+    """Get skill definition for a stage. Call maestro_help('maestro_get_skill') for details."""
     skill = load_skill_definition(stage)
     if not skill:
         return {"ok": False, "error": f"Skill not found for stage: {stage}"}
@@ -888,26 +795,7 @@ def maestro_get_role(
         "judge",
     ],
 ) -> Dict[str, Any]:
-    """
-    Get the role/persona prompt for a specific role.
-
-    Roles provide system prompts that shape how an LLM approaches a task.
-    Each role has specific traits, focus areas, and output expectations.
-
-    Available roles:
-    - example_analyst: Extracts facts, observations, constraints
-    - hypothesis_scientist: Generates testable hypotheses
-    - implementer: Makes minimal, testable code changes
-    - debugger: Systematic debugging with iteration limits
-    - refiner: Quality improvement and regression testing
-    - judge: Objective candidate selection
-
-    Args:
-        role: Which role's prompt to retrieve.
-
-    Returns:
-        Role definition with prompt content and metadata.
-    """
+    """Get role/persona prompt. Call maestro_help('maestro_get_role') for details."""
     prompt_content = load_role_prompt(role)
     if not prompt_content:
         return {"ok": False, "error": f"Role not found: {role}"}
@@ -942,27 +830,7 @@ def maestro_get_schema(
         "tools",
     ],
 ) -> Dict[str, Any]:
-    """
-    Get a JSON schema for output validation.
-
-    Schemas define the expected structure of outputs from each stage.
-    Use these to validate that your outputs conform to the expected format.
-
-    Available schemas:
-    - stage1_output: Example Analysis output
-    - stage2_output: Hypothesis output
-    - stage3_output: Implementation output
-    - stage4_output: Debug Loop output
-    - stage5_output: Recursive Improvement output
-    - judge_output: Candidate selection output
-    - tools: All tool input/output schemas
-
-    Args:
-        schema: Which schema to retrieve.
-
-    Returns:
-        JSON Schema definition.
-    """
+    """Get JSON schema for validation. Call maestro_help('maestro_get_schema') for details."""
     schema_content = load_output_schema(schema)
     if not schema_content:
         return {"ok": False, "error": f"Schema not found: {schema}"}
@@ -996,33 +864,7 @@ def maestro_consult_with_role(
     stage: Optional[str] = None,
     timeout_sec: int = 300,
 ) -> Dict[str, Any]:
-    """
-    Consult an LLM with a specific role/persona system prompt.
-
-    This combines maestro_consult with role-based prompting from cli_clients.yaml.
-    The role's system prompt is prepended to shape the LLM's response style.
-
-    Roles and their purposes:
-    - example_analyst: Factual observation extraction (Stage 1)
-    - hypothesis_scientist: Testable hypothesis generation (Stage 2)
-    - implementer: Minimal code changes (Stage 3)
-    - debugger: Systematic iteration (Stage 4)
-    - refiner: Quality improvement (Stage 5)
-    - judge: Candidate selection (Any stage)
-
-    Args:
-        prompt: The specific question or task.
-        role: Which persona to use.
-        provider: Which CLI to use.
-        context_files: File paths to include.
-        context_facts: Established facts.
-        context_errors: Error logs or stack traces.
-        stage: Current workflow stage.
-        timeout_sec: Timeout for the CLI call.
-
-    Returns:
-        Dictionary with response and metadata.
-    """
+    """Consult LLM with role-based prompting. Call maestro_help('maestro_consult_with_role') for details."""
     # Initialize mutable defaults
     context_files = context_files or []
     context_facts = context_facts or []
@@ -1102,20 +944,7 @@ def maestro_consult_with_role(
 
 @mcp.tool()
 def maestro_get_coordination_policy() -> Dict[str, Any]:
-    """
-    Get the coordination policies based on the paper.
-
-    Returns the rules from "Towards a Science of Scaling Agent Systems":
-    - Capability threshold: When to skip ensemble (~45%)
-    - Tool-coordination trade-off: Which stages prefer single agent
-    - Error amplification: Why Independent topology is forbidden
-    - Sequential task handling: Why debug uses single agent
-
-    Use this to understand WHEN to use multi-agent coordination.
-
-    Returns:
-        Coordination policies and topologies.
-    """
+    """Get paper-based coordination policies. Call maestro_help('maestro_get_coordination_policy') for details."""
     policies = CLI_CONFIG.get("policies", {})
     topologies = CLI_CONFIG.get("topologies", {})
     stage_mapping = CLI_CONFIG.get("stage_mapping", {})
@@ -1157,31 +986,7 @@ def maestro_verify(
     stop_on_failure: bool = False,
     parallel: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Run verification commands (tests, lint, type-check).
-
-    Paper Insight: "Test, don't vote" - Deterministic signals (test pass/fail)
-    are more reliable than LLM consensus for code correctness.
-
-    This is the foundation of the "tests_first" selection mode.
-
-    Args:
-        commands: List of command specs:
-                  [{"command": "pytest -v", "type": "unit_test"}, ...]
-                  Types: unit_test, lint, type_check, format, build, custom
-        cwd: Working directory for commands.
-        stop_on_failure: Stop after first failure.
-        parallel: Run commands in parallel (for independent checks).
-
-    Returns:
-        VerificationReport with pass/fail status for each command.
-
-    Example:
-        maestro_verify([
-            {"command": "python -m pytest tests/ -v", "type": "unit_test"},
-            {"command": "python -m ruff check src/", "type": "lint"}
-        ])
-    """
+    """Run verification commands (tests, lint, type-check). Call maestro_help('maestro_verify') for details."""
     engine = VerificationEngine()
 
     if parallel:
@@ -1225,35 +1030,7 @@ def maestro_apply_patch(
     workspace_root: Optional[str] = None,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Apply a unified diff patch to the workspace safely.
-
-    Paper Insight: "Tool execution is restricted to single Executor"
-    This tool provides safe, auditable file modifications with:
-    - Path validation (no escape from workspace)
-    - Allowlist-based file patterns
-    - Automatic backups before modification
-    - Structured logging of all changes
-
-    Args:
-        patch: Unified diff content (git diff or standard diff format).
-        workspace_root: Root directory for patch application.
-                        Defaults to current working directory.
-        dry_run: If True, validate patch but don't apply.
-
-    Returns:
-        PatchResult with files changed, created, failed, and backup location.
-
-    Example:
-        maestro_apply_patch('''
-        --- a/src/main.py
-        +++ b/src/main.py
-        @@ -10,6 +10,7 @@
-         def main():
-        +    print("Hello")
-             pass
-        ''')
-    """
+    """Apply unified diff patch safely with backups. Call maestro_help('maestro_apply_patch') for details."""
     root = workspace_root or os.getcwd()
     manager = WorkspaceManager(root)
 
@@ -1293,34 +1070,7 @@ def maestro_consensus_vote(
     require_json: bool = False,
     max_response_chars: int = 2000,
 ) -> Dict[str, Any]:
-    """
-    Run MAKER-style first-to-ahead-by-k voting on a micro-decision.
-
-    Paper Insight: From "Solving a Million-Step LLM Task With Zero Errors":
-    - For micro-decisions, voting with error correction dramatically reduces errors
-    - Red-flagging (rejecting malformed responses) improves accuracy
-    - First-to-ahead-by-k is more efficient than fixed-round voting
-
-    Use for micro-decisions like:
-    - "Which file is most likely the source of the bug?" (selection)
-    - "Is this patch safe to apply?" (binary yes/no)
-    - "What's the key error signal in this log?" (extraction)
-
-    DO NOT use for:
-    - Code generation (too complex for voting)
-    - Implementation decisions (need context, not consensus)
-
-    Args:
-        question: The micro-decision question (keep it focused and answerable).
-        k: Votes ahead needed to win (higher = more confident, slower).
-        max_rounds: Maximum voting rounds before picking plurality winner.
-        providers: Which providers to query (cycled through).
-        require_json: If True, responses must be valid JSON.
-        max_response_chars: Maximum response length (red-flag if exceeded).
-
-    Returns:
-        ConsensusResult with winner, confidence, and vote trace.
-    """
+    """MAKER-style first-to-ahead-by-k voting for micro-decisions. Call maestro_help('maestro_consensus_vote') for details."""
     # Initialize mutable defaults
     providers = providers or ["codex", "gemini", "claude"]
 
@@ -1379,29 +1129,7 @@ def maestro_validate_content(
     require_json_fields: Optional[List[str]] = None,
     forbidden_patterns: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Validate content against MAKER-style red-flag criteria.
-
-    Paper Insight: "Format errors are signals of reasoning errors"
-    Rejecting malformed responses BEFORE using them improves overall accuracy.
-
-    Red-flag criteria:
-    - Content too long (indicates rambling, loss of focus)
-    - Content too short (indicates incomplete response)
-    - Hedging language ("I'm not sure", "it's unclear")
-    - Missing required JSON fields
-    - Invalid diff format (for patches)
-
-    Args:
-        content: The content to validate.
-        content_type: Type of content ("general", "diff", "json").
-        max_chars: Maximum allowed characters.
-        require_json_fields: Required fields if content is JSON.
-        forbidden_patterns: Additional patterns to reject.
-
-    Returns:
-        Validation result with is_valid and reason if invalid.
-    """
+    """Validate content against MAKER red-flag criteria. Call maestro_help('maestro_validate_content') for details."""
     # Initialize mutable defaults
     require_json_fields = require_json_fields or []
     forbidden_patterns = forbidden_patterns or []
@@ -1444,29 +1172,7 @@ def maestro_log_evidence(
     confidence: float = 1.0,
     linked_evidence_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Log evidence to the reasoning chain for auditability.
-
-    Evidence-first approach: Every decision should link to concrete evidence.
-    This enables post-hoc analysis of why decisions were made.
-
-    Evidence types:
-    - observation: Facts observed from code/logs
-    - hypothesis: Proposed explanation for an issue
-    - decision: Choice made with rationale
-    - verification: Test/lint result
-
-    Args:
-        evidence_type: Type of evidence being logged.
-        stage: Which workflow stage this evidence belongs to.
-        content: The actual evidence content (structured dict).
-        source: Where the evidence came from.
-        confidence: How reliable is this evidence (0.0-1.0).
-        linked_evidence_ids: IDs of related evidence to link.
-
-    Returns:
-        The evidence ID for future reference.
-    """
+    """Log evidence to reasoning chain for auditability. Call maestro_help('maestro_log_evidence') for details."""
     # Initialize mutable defaults
     linked_evidence_ids = linked_evidence_ids or []
 
@@ -1504,22 +1210,7 @@ def maestro_get_evidence_chain(
     stage: Optional[str] = None,
     limit: int = 50,
 ) -> Dict[str, Any]:
-    """
-    Query the evidence chain for audit and analysis.
-
-    Use to:
-    - Review what evidence led to a decision
-    - Trace back through the reasoning chain
-    - Identify gaps in evidence
-
-    Args:
-        evidence_type: Filter by type (observation, hypothesis, decision, etc.)
-        stage: Filter by workflow stage.
-        limit: Maximum number of entries to return.
-
-    Returns:
-        List of evidence entries matching the filters.
-    """
+    """Query evidence chain for audit and analysis. Call maestro_help('maestro_get_evidence_chain') for details."""
     type_map = {
         "observation": EvidenceType.OBSERVATION,
         "hypothesis": EvidenceType.HYPOTHESIS,
@@ -1555,19 +1246,7 @@ def maestro_restore_from_backup(
     workspace_root: Optional[str] = None,
     files: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Restore files from a backup session.
-
-    Use when a patch introduced bugs and you need to rollback.
-
-    Args:
-        backup_session: The backup session ID (from maestro_apply_patch result).
-        workspace_root: Root directory for restoration.
-        files: Optional list of specific files to restore.
-
-    Returns:
-        List of restored files and any failures.
-    """
+    """Restore files from backup session. Call maestro_help('maestro_restore_from_backup') for details."""
     root = workspace_root or os.getcwd()
     manager = WorkspaceManager(root)
 
@@ -1596,25 +1275,7 @@ def maestro_restore_from_backup(
 def maestro_enter_stage(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
-    """
-    Enter a workflow stage and load appropriate tools dynamically.
-
-    MAKER Insight: "Minimize context overhead" - Only load tools needed for current stage.
-    This reduces token usage and improves response quality.
-
-    Tool loading by stage:
-    - analyze: context packing, evidence logging
-    - hypothesize: ensemble, voting, validation
-    - implement: patch, verify
-    - debug: verify, rollback, context
-    - improve: ensemble, patch, verify
-
-    Args:
-        stage: Which stage to enter.
-
-    Returns:
-        Loaded tools list = available tools for this stage.
-    """
+    """Enter stage and load appropriate tools dynamically. Call maestro_help('maestro_enter_stage') for details."""
     stage_map = {
         "analyze": StageType.ANALYZE,
         "hypothesize": StageType.HYPOTHESIZE,
@@ -1648,26 +1309,7 @@ def maestro_enter_stage(
 def maestro_enter_skill(
     skill_name: str,
 ) -> Dict[str, Any]:
-    """
-    Enter a specific skill for fine-grained tool loading.
-
-    Skills are sub-tasks within a stage with specific tool requirements.
-    This provides the most context-efficient tool loading.
-
-    Example skills:
-    - spec_extraction (analyze) - Extract I/O specs
-    - edge_case_generation (analyze) - Generate edge cases
-    - root_cause_analysis (hypothesize) - Find root causes
-    - patch_generation (implement) - Generate patches
-    - failure_classification (debug) - Classify errors
-    - refactoring (improve) - Apply refactorings
-
-    Args:
-        skill_name: Name of the skill to enter.
-
-    Returns:
-        Skill info and loaded tools.
-    """
+    """Enter specific skill for fine-grained tool loading. Call maestro_help('maestro_enter_skill') for details."""
     success, loaded = skill_session.enter_skill(skill_name)
 
     if not success:
@@ -1698,25 +1340,7 @@ def maestro_enter_skill(
 def maestro_get_micro_steps(
     stage: Optional[Literal["analyze", "hypothesize", "implement", "debug", "improve"]] = None,
 ) -> Dict[str, Any]:
-    """
-    Get available micro-steps for MAKER-style decomposition.
-
-    MAKER Insight: "Maximal Agentic Decomposition" - Break tasks into atomic steps.
-    Each micro-step is small enough for voting to be effective.
-
-    Micro-step types by stage:
-    - Analyze: s1_spec_extract, s2_edge_case, s3_mre
-    - Hypothesize: h1_root_cause, h2_verification
-    - Implement: c1_minimal_patch, c2_compile_check
-    - Debug: d1_failure_label, d2_next_experiment
-    - Improve: r1_refactor, r2_perf
-
-    Args:
-        stage: Optional stage filter. Uses current stage if not specified.
-
-    Returns:
-        List of micro-step specifications.
-    """
+    """Get available micro-steps for MAKER decomposition. Call maestro_help('maestro_get_micro_steps') for details."""
     if stage:
         stage_map = {
             "analyze": StageType.ANALYZE,
@@ -1777,27 +1401,7 @@ def maestro_vote_micro_step(
     max_rounds: int = 15,
     providers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Run MAKER-style first-to-ahead-by-k voting on a micro-step.
-
-    MAKER Paper Insight:
-    - Step-level voting with small k dramatically reduces error rate
-    - Red-flagging rejects format errors BEFORE voting
-    - Different step types have different default k values
-
-    This is THE core mechanism for error correction in long-horizon tasks.
-
-    Args:
-        step_type: Type of micro-step (determines validation rules).
-        prompt: The task prompt for this micro-step.
-        context: Additional context to include.
-        k: Votes ahead needed to win. Uses step-specific default if not set.
-        max_rounds: Maximum voting rounds.
-        providers: Which LLM providers to use (cycled through).
-
-    Returns:
-        VoteResult with winner content, confidence, and voting trace.
-    """
+    """Run MAKER voting on micro-step with error correction. Call maestro_help('maestro_vote_micro_step') for details."""
     # Initialize mutable defaults
     providers = providers or ["codex", "gemini"]
 
@@ -1895,28 +1499,7 @@ def maestro_calibrate(
     num_samples: int = 10,
     providers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Calibrate voting parameters (k) for a step type.
-
-    MAKER Paper Insight:
-    - Different step types have different accuracy p
-    - k should be calibrated based on p and target success rate
-    - With proper calibration, even low-accuracy steps can achieve high overall success
-
-    Run this before a long workflow to optimize k for each step type.
-
-    Args:
-        step_type: Which micro-step type to calibrate.
-        test_prompt: A representative prompt for sampling.
-        oracle_command: Optional command to verify correctness.
-        target_success_rate: Desired overall workflow success rate.
-        estimated_total_steps: Expected total steps in workflow.
-        num_samples: Number of samples for estimation.
-        providers: Which providers to sample from.
-
-    Returns:
-        CalibrationResult with recommended k and accuracy estimates.
-    """
+    """Calibrate voting parameters for step type. Call maestro_help('maestro_calibrate') for details."""
     # Initialize mutable defaults
     providers = providers or ["codex", "gemini"]
 
@@ -1993,33 +1576,7 @@ def maestro_red_flag_check(
     ]] = None,
     rules: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Check content for MAKER-style red flags.
-
-    MAKER Paper Insight: "Format errors signal reasoning errors"
-    - Don't try to repair malformed responses
-    - Discard and resample instead
-    - This reduces CORRELATED errors, not just average errors
-
-    Red flag types:
-    - too_long: Response exceeds max length (indicates rambling)
-    - too_short: Response too short (incomplete)
-    - hedging: Contains hedging language ("I'm not sure")
-    - missing_fields: Missing required JSON fields
-    - invalid_diff: Invalid diff format
-    - multi_file: Patch affects too many files
-    - dangerous_code: Contains dangerous patterns
-    - dangerous_command: Contains dangerous commands
-    - forbidden_file: References forbidden files (.env, secrets)
-
-    Args:
-        content: Content to validate.
-        step_type: Optional step type for step-specific rules.
-        rules: Optional explicit rules to check.
-
-    Returns:
-        Red flag result with is_flagged status and reasons.
-    """
+    """Check content for MAKER red flags. Call maestro_help('maestro_red_flag_check') for details."""
     step_enum = MicroStepType(step_type) if step_type else None
     result = red_flagger.validate(content, step_enum, rules)
 
@@ -2044,15 +1601,7 @@ def maestro_red_flag_check(
 
 @mcp.tool()
 def maestro_get_loaded_tools() -> Dict[str, Any]:
-    """
-    Get the list of currently loaded tools.
-
-    Use to understand what tools are available in current context.
-    Tools are dynamically loaded based on current stage/skill.
-
-    Returns:
-        List of loaded tool names and context cost.
-    """
+    """Get currently loaded tools list. Call maestro_help('maestro_get_loaded_tools') for details."""
     state = skill_session.get_state()
 
     return {
@@ -2074,18 +1623,7 @@ def maestro_get_loaded_tools() -> Dict[str, Any]:
 def maestro_recommend_tools(
     task_description: str,
 ) -> Dict[str, Any]:
-    """
-    Get recommended tools for a task description.
-
-    Analyzes the task and recommends which tools to load.
-    Useful for bootstrapping before entering a specific stage.
-
-    Args:
-        task_description: Description of what you want to accomplish.
-
-    Returns:
-        Recommended tools and suggested stage.
-    """
+    """Get recommended tools for task. Call maestro_help('maestro_recommend_tools') for details."""
     recommended = get_recommended_tools_for_task(task_description, skill_manifest)
 
     # Determine likely stage
@@ -2116,16 +1654,7 @@ def maestro_recommend_tools(
 
 @mcp.tool()
 def maestro_exit_stage() -> Dict[str, Any]:
-    """
-    Exit current stage and unload non-core tools.
-
-    Call this when transitioning between stages to minimize context.
-    Only core tools (maestro_list_providers, maestro_get_skill, maestro_workflow_state)
-    remain loaded.
-
-    Returns:
-        Updated tool state after unloading.
-    """
+    """Exit stage and unload non-core tools. Call maestro_help('maestro_exit_stage') for details."""
     skill_session.exit_stage()
     state = skill_session.get_state()
 
@@ -2147,29 +1676,7 @@ def maestro_classify_task(
     code_context: Optional[str] = None,
     error_logs: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Classify task structure to determine optimal coordination topology.
-
-    Paper Rule A: "Domain/task structure dependency is absolute"
-    This tool analyzes the task to extract features that determine
-    whether to use MAS (multi-agent) or SAS (single-agent).
-
-    Key features extracted:
-    - decomposability_score: Can task be split into parallel subtasks?
-    - sequential_dependency_score: How much does each step depend on previous?
-    - tool_complexity: How many/complex tools are needed?
-
-    Use this FIRST in Stage 1 (Analyze) to inform architecture selection
-    for subsequent stages.
-
-    Args:
-        task_description: Description of the task/problem.
-        code_context: Optional code snippets for context.
-        error_logs: Optional error logs or stack traces.
-
-    Returns:
-        TaskStructureFeatures with scores and recommendations.
-    """
+    """Classify task structure for optimal coordination topology. Call maestro_help('maestro_classify_task') for details."""
     features = task_classifier.classify(
         task_description=task_description,
         code_context=code_context,
@@ -2212,30 +1719,7 @@ def maestro_select_architecture(
     tool_complexity: float = 0.3,
     force_topology: Optional[Literal["sas", "mas_independent", "mas_centralized"]] = None,
 ) -> Dict[str, Any]:
-    """
-    Select the optimal coordination topology for a workflow stage.
-
-    Paper Rules Applied:
-    - Rule A: Architecture depends on task structure
-    - Rule B: Decomposable → MAS, Sequential → SAS
-    - Rule C: Coordination overhead is a cost to minimize
-    - Rule D: Use calibration data when available
-
-    The selected topology determines:
-    - How many agents to use
-    - How they communicate
-    - When to fall back to simpler topology
-
-    Args:
-        stage: Current workflow stage.
-        decomposability_score: 0-1, how parallelizable is the task.
-        sequential_dependency_score: 0-1, how sequential are dependencies.
-        tool_complexity: 0-1, how complex is tool usage.
-        force_topology: Optional override ("sas", "mas_independent", "mas_centralized").
-
-    Returns:
-        CoordinationDecision with topology, parameters, and fallback plan.
-    """
+    """Select optimal coordination topology for stage. Call maestro_help('maestro_select_architecture') for details."""
     features = TaskStructureFeatures(
         decomposability_score=decomposability_score,
         sequential_dependency_score=sequential_dependency_score,
@@ -2295,29 +1779,7 @@ def maestro_check_degradation(
     failures: int = 0,
     redundancy_rate: float = 0.0,
 ) -> Dict[str, Any]:
-    """
-    Check if coordination should degrade to a simpler topology.
-
-    Paper Rule C: "Coordination overhead is a first-class cost function"
-    When MAS isn't improving results, automatically fall back to SAS.
-
-    Degradation triggers:
-    - High coordination overhead without success improvement
-    - Error amplification > 1.0 (MAS making more errors than SAS would)
-    - High redundancy (agents producing identical outputs)
-    - Consecutive format errors
-
-    Args:
-        current_topology: Current coordination topology.
-        total_messages: Total messages sent in coordination.
-        total_rounds: Total coordination rounds.
-        successes: Number of successful outcomes.
-        failures: Number of failed outcomes.
-        redundancy_rate: 0-1, similarity of agent outputs.
-
-    Returns:
-        Degradation decision with new topology if needed.
-    """
+    """Check if should degrade to simpler topology. Call maestro_help('maestro_check_degradation') for details."""
     # Build metrics
     metrics = CoordinationMetrics(
         total_messages=total_messages,
@@ -2392,26 +1854,7 @@ def maestro_record_coordination_result(
     rounds: int = 1,
     outputs: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Record coordination result for calibration (Rule D).
-
-    Paper Rule D: "Model family calibration is necessary"
-    By recording results, the system learns which topology works best
-    for your specific codebase and task types.
-
-    Call this after each coordination attempt to build calibration data.
-
-    Args:
-        topology: Which topology was used.
-        success: Whether the coordination succeeded.
-        tokens_used: Tokens consumed.
-        messages_sent: Messages sent between agents.
-        rounds: Coordination rounds.
-        outputs: Optional list of agent outputs (for redundancy calculation).
-
-    Returns:
-        Updated statistics for the topology.
-    """
+    """Record coordination result for calibration. Call maestro_help('maestro_record_coordination_result') for details."""
     topology_map = {
         "sas": CoordinationTopology.SAS,
         "mas_independent": CoordinationTopology.MAS_INDEPENDENT,
@@ -2478,22 +1921,7 @@ def maestro_record_coordination_result(
 
 @mcp.tool()
 def maestro_get_coordination_stats() -> Dict[str, Any]:
-    """
-    Get coordination calibration statistics.
-
-    Paper Rule D: Use calibration data to inform architecture selection.
-
-    Returns statistics for each topology:
-    - Success rate
-    - Average overhead
-    - Average token usage
-    - Number of samples
-
-    Use this to understand which topologies work best for your tasks.
-
-    Returns:
-        Statistics per topology and recommendations.
-    """
+    """Get coordination calibration statistics. Call maestro_help('maestro_get_coordination_stats') for details."""
     stats = {}
     for topo in [CoordinationTopology.SAS, CoordinationTopology.MAS_INDEPENDENT, CoordinationTopology.MAS_CENTRALIZED]:
         topo_stats = metrics_tracker.get_topology_stats(topo)
@@ -2536,22 +1964,7 @@ def maestro_get_coordination_stats() -> Dict[str, Any]:
 def maestro_get_stage_strategy(
     stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
 ) -> Dict[str, Any]:
-    """
-    Get the recommended coordination strategy for a workflow stage.
-
-    Returns stage-specific guidance based on paper insights:
-    - analyze: Parallel info gathering, score-based selection
-    - hypothesize: Parallel hypothesis gen, falsifiability scoring
-    - implement: Parallel patch gen, TEST-FIRST selection
-    - debug: SEQUENTIAL (SAS), minimize coordination
-    - improve: Parallel review, skill extraction
-
-    Args:
-        stage: The workflow stage.
-
-    Returns:
-        Detailed strategy with topology, voting mode, and red-flag rules.
-    """
+    """Get recommended coordination strategy for stage. Call maestro_help('maestro_get_stage_strategy') for details."""
     features = TaskStructureFeatures()  # Default features
     strategy = architecture_engine.get_stage_recommendation(stage, features)
 
@@ -2604,6 +2017,426 @@ def maestro_get_stage_strategy(
 
 
 # ============================================================================
+# TOOL: maestro_request_approval - Request human approval for a stage
+# ============================================================================
+
+@mcp.tool()
+def maestro_request_approval(
+    stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
+    outputs: Dict[str, Any],
+    duration_ms: float = 0.0,
+    metrics: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Request human approval before proceeding to the next stage.
+
+    This tool creates a detailed report with questions for the human reviewer.
+    The workflow will NOT proceed until approval is submitted.
+
+    Call maestro_help('maestro_request_approval') for details.
+    """
+    request = human_loop_manager.request_approval(
+        stage=stage,
+        outputs=outputs,
+        duration_ms=duration_ms,
+        metrics=metrics,
+    )
+
+    # Format for display
+    display_text = format_approval_request_for_display(request)
+
+    return {
+        "ok": True,
+        "request_id": request.request_id,
+        "stage": stage,
+        "status": request.status.value,
+        "display": display_text,
+        "report": request.report.to_dict(),
+        "questions_count": len(request.report.questions),
+        "critical_questions": [
+            q.to_dict() for q in request.report.questions
+            if q.priority == ReviewPriority.CRITICAL
+        ],
+        "action_required": "Please review the report and use maestro_submit_approval to approve/reject",
+        "action_required_ko": "리포트를 검토하고 maestro_submit_approval을 사용하여 승인/거부해 주세요",
+    }
+
+
+# ============================================================================
+# TOOL: maestro_submit_approval - Submit approval decision
+# ============================================================================
+
+@mcp.tool()
+def maestro_submit_approval(
+    request_id: str,
+    approved: bool,
+    feedback: Optional[str] = None,
+    question_responses: Optional[Dict[str, str]] = None,
+    revision_instructions: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Submit approval decision for a pending stage.
+
+    Args:
+        request_id: The approval request ID from maestro_request_approval
+        approved: True to approve and proceed, False to reject
+        feedback: General feedback or comments
+        question_responses: Responses to specific review questions (keyed by question ID)
+        revision_instructions: If not approved, instructions for revision
+
+    Call maestro_help('maestro_submit_approval') for details.
+    """
+    result = human_loop_manager.submit_approval(
+        request_id=request_id,
+        approved=approved,
+        feedback=feedback,
+        question_responses=question_responses,
+        revision_instructions=revision_instructions,
+    )
+
+    return result
+
+
+# ============================================================================
+# TOOL: maestro_get_pending_approvals - Get pending approval requests
+# ============================================================================
+
+@mcp.tool()
+def maestro_get_pending_approvals() -> Dict[str, Any]:
+    """
+    Get all pending approval requests.
+
+    Returns a list of all requests awaiting human approval.
+    Call maestro_help('maestro_get_pending_approvals') for details.
+    """
+    pending = human_loop_manager.get_pending_requests()
+
+    return {
+        "ok": True,
+        "count": len(pending),
+        "pending_requests": pending,
+        "message": f"{len(pending)} approval(s) pending" if pending else "No pending approvals",
+        "message_ko": f"{len(pending)}개의 승인 대기 중" if pending else "대기 중인 승인 없음",
+    }
+
+
+# ============================================================================
+# TOOL: maestro_get_approval_history - Get approval history
+# ============================================================================
+
+@mcp.tool()
+def maestro_get_approval_history(
+    stage: Optional[str] = None,
+    limit: int = 20,
+) -> Dict[str, Any]:
+    """
+    Get history of approval decisions.
+
+    Args:
+        stage: Filter by stage name (optional)
+        limit: Maximum number of records to return
+
+    Call maestro_help('maestro_get_approval_history') for details.
+    """
+    history = human_loop_manager.get_approval_history()
+
+    # Filter by stage if specified
+    if stage:
+        history = [h for h in history if h.get("stage") == stage]
+
+    # Apply limit
+    history = history[-limit:]
+
+    # Summary stats
+    approved_count = sum(1 for h in history if h.get("status") == "approved")
+    rejected_count = sum(1 for h in history if h.get("status") == "rejected")
+    revision_count = sum(1 for h in history if h.get("status") == "revision_requested")
+
+    return {
+        "ok": True,
+        "count": len(history),
+        "history": history,
+        "summary": {
+            "approved": approved_count,
+            "rejected": rejected_count,
+            "revision_requested": revision_count,
+        },
+    }
+
+
+# ============================================================================
+# TOOL: maestro_run_stage_with_approval - Run stage and request approval
+# ============================================================================
+
+@mcp.tool()
+def maestro_run_stage_with_approval(
+    stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
+    task: str,
+    context_files: Optional[List[str]] = None,
+    context_facts: Optional[List[str]] = None,
+    context_errors: Optional[List[str]] = None,
+    providers: Optional[List[str]] = None,
+    baseline_confidence: float = 0.0,
+) -> Dict[str, Any]:
+    """
+    Execute a workflow stage AND automatically request human approval.
+
+    This is the recommended way to run stages with human-in-the-loop.
+    It combines maestro_run_stage and maestro_request_approval.
+
+    The workflow will pause until the human approves or rejects.
+
+    Call maestro_help('maestro_run_stage_with_approval') for details.
+    """
+    # Initialize mutable defaults
+    context_files = context_files or []
+    context_facts = context_facts or []
+    context_errors = context_errors or []
+
+    # Map string to Stage enum
+    stage_enum = {
+        "analyze": Stage.ANALYZE,
+        "hypothesize": Stage.HYPOTHESIZE,
+        "implement": Stage.IMPLEMENT,
+        "debug": Stage.DEBUG,
+        "improve": Stage.IMPROVE,
+    }.get(stage)
+
+    if not stage_enum:
+        return {"ok": False, "error": f"Unknown stage: {stage}"}
+
+    # Initialize context
+    context = StageContext(
+        task=task,
+        files=context_files,
+        facts=context_facts,
+        errors=context_errors,
+    )
+
+    # Create runner
+    runner = WorkflowRunner(
+        engine=workflow_engine,
+        registry=registry,
+        tracer=trace_store,
+    )
+
+    # Run stage
+    try:
+        result = asyncio.get_event_loop().run_until_complete(
+            runner.run_stage(
+                stage=stage_enum,
+                context=context,
+                providers=providers,
+                baseline_confidence=baseline_confidence,
+            )
+        )
+    except RuntimeError:
+        result = asyncio.run(
+            runner.run_stage(
+                stage=stage_enum,
+                context=context,
+                providers=providers,
+                baseline_confidence=baseline_confidence,
+            )
+        )
+
+    if not result.success:
+        return {
+            "ok": False,
+            "stage": stage,
+            "error": result.error,
+            "elapsed_ms": result.elapsed_ms,
+        }
+
+    # Create approval request
+    approval_request = human_loop_manager.request_approval(
+        stage=stage,
+        outputs=result.output,
+        duration_ms=result.elapsed_ms,
+        metrics={
+            "consults_used": result.consults_used,
+            "providers": providers or ["default"],
+        },
+    )
+
+    # Format for display
+    display_text = format_approval_request_for_display(approval_request)
+
+    return {
+        "ok": True,
+        "stage": stage,
+        "stage_display": result.stage.display_name,
+        "stage_result": {
+            "success": result.success,
+            "output": result.output,
+            "next_stage": result.next_stage.value if result.next_stage else None,
+            "consults_used": result.consults_used,
+            "elapsed_ms": result.elapsed_ms,
+        },
+        "approval": {
+            "request_id": approval_request.request_id,
+            "status": "pending",
+            "display": display_text,
+            "questions_count": len(approval_request.report.questions),
+        },
+        "action_required": (
+            f"Stage '{stage}' completed. Please review the results above and use "
+            f"maestro_submit_approval(request_id='{approval_request.request_id}', approved=True/False, ...) "
+            "to approve or reject before proceeding to the next stage."
+        ),
+        "action_required_ko": (
+            f"스테이지 '{stage}' 완료. 위의 결과를 검토하고 "
+            f"maestro_submit_approval(request_id='{approval_request.request_id}', approved=True/False, ...) "
+            "를 사용하여 다음 스테이지로 진행하기 전에 승인 또는 거부해 주세요."
+        ),
+    }
+
+
+# ============================================================================
+# TOOL: maestro_get_stage_questions - Get review questions for a stage
+# ============================================================================
+
+@mcp.tool()
+def maestro_get_stage_questions(
+    stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"],
+) -> Dict[str, Any]:
+    """
+    Get the review questions that will be asked for a specific stage.
+
+    Use this to preview what questions the human will need to answer.
+    Call maestro_help('maestro_get_stage_questions') for details.
+    """
+    from maestro.human_loop import STAGE_QUESTIONS
+
+    questions = STAGE_QUESTIONS.get(stage, [])
+
+    formatted_questions = []
+    for q in questions:
+        formatted_questions.append({
+            "id": q["id"],
+            "question": q["question"],
+            "question_ko": q["question_ko"],
+            "priority": q["priority"].value,
+            "options": q.get("options", []),
+            "requires_text_response": q.get("requires_text_response", False),
+        })
+
+    # Group by priority
+    critical = [q for q in formatted_questions if q["priority"] == "critical"]
+    high = [q for q in formatted_questions if q["priority"] == "high"]
+    medium = [q for q in formatted_questions if q["priority"] == "medium"]
+    low = [q for q in formatted_questions if q["priority"] == "low"]
+
+    return {
+        "ok": True,
+        "stage": stage,
+        "total_questions": len(formatted_questions),
+        "questions": formatted_questions,
+        "by_priority": {
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+            "low": low,
+        },
+        "summary": {
+            "critical_count": len(critical),
+            "high_count": len(high),
+            "medium_count": len(medium),
+            "low_count": len(low),
+        },
+    }
+
+
+# ============================================================================
+# TOOL: maestro_workflow_with_hitl - Full workflow with human-in-the-loop
+# ============================================================================
+
+@mcp.tool()
+def maestro_workflow_with_hitl(
+    task: str,
+    start_stage: Literal["analyze", "hypothesize", "implement", "debug", "improve"] = "analyze",
+    auto_approve_low_risk: bool = False,
+) -> Dict[str, Any]:
+    """
+    Start a workflow that requires human approval at each stage.
+
+    This tool initializes a human-in-the-loop workflow where:
+    1. Each stage must be explicitly approved before proceeding
+    2. Detailed questions are asked at each stage
+    3. Feedback is collected and incorporated
+
+    Args:
+        task: The task description
+        start_stage: Which stage to start from (default: analyze)
+        auto_approve_low_risk: If True, automatically approve stages with no critical issues
+
+    Returns guidance on how to proceed with the HITL workflow.
+
+    Call maestro_help('maestro_workflow_with_hitl') for details.
+    """
+    # Initialize workflow
+    context = workflow_engine.start(task)
+
+    # Build guidance
+    stage_order = ["analyze", "hypothesize", "implement", "debug", "improve"]
+    start_idx = stage_order.index(start_stage)
+    remaining_stages = stage_order[start_idx:]
+
+    guidance = {
+        "workflow_started": True,
+        "task": task,
+        "start_stage": start_stage,
+        "remaining_stages": remaining_stages,
+        "auto_approve_low_risk": auto_approve_low_risk,
+        "instructions": {
+            "en": [
+                f"1. Run the first stage with: maestro_run_stage_with_approval(stage='{start_stage}', task='{task[:50]}...')",
+                "2. Review the detailed report and questions",
+                "3. Use maestro_submit_approval() to approve/reject",
+                "4. If approved, proceed to the next stage",
+                "5. Repeat until all stages are complete",
+            ],
+            "ko": [
+                f"1. 첫 번째 스테이지 실행: maestro_run_stage_with_approval(stage='{start_stage}', task='{task[:50]}...')",
+                "2. 상세 리포트와 질문을 검토",
+                "3. maestro_submit_approval()을 사용하여 승인/거부",
+                "4. 승인되면 다음 스테이지로 진행",
+                "5. 모든 스테이지가 완료될 때까지 반복",
+            ],
+        },
+        "stage_questions_preview": {
+            stage: len(STAGE_QUESTIONS.get(stage, []))
+            for stage in remaining_stages
+        },
+        "tips": {
+            "en": [
+                "Use maestro_get_stage_questions() to preview questions for any stage",
+                "Use maestro_get_pending_approvals() to see pending requests",
+                "Use maestro_get_approval_history() to review past decisions",
+                "Provide detailed feedback to improve future iterations",
+            ],
+            "ko": [
+                "maestro_get_stage_questions()를 사용하여 각 스테이지의 질문을 미리 볼 수 있습니다",
+                "maestro_get_pending_approvals()를 사용하여 대기 중인 요청을 확인할 수 있습니다",
+                "maestro_get_approval_history()를 사용하여 과거 결정을 검토할 수 있습니다",
+                "상세한 피드백을 제공하여 향후 반복을 개선하세요",
+            ],
+        },
+    }
+
+    return {
+        "ok": True,
+        "message": "Human-in-the-loop workflow initialized",
+        "message_ko": "Human-in-the-loop 워크플로우가 초기화되었습니다",
+        **guidance,
+    }
+
+
+# Import STAGE_QUESTIONS for the above tool
+from maestro.human_loop import STAGE_QUESTIONS
+
+
+# ============================================================================
 # Run server
 # ============================================================================
 
@@ -2613,4 +2446,5 @@ if __name__ == "__main__":
     logger.info(f"Trace directory: {config.tracing.trace_dir}")
     logger.info(f"Max tools per stage: {tool_registry.max_tools}")
     logger.info(f"Disabled tools: {disabled_tools}")
+    logger.info("Human-in-the-Loop enabled for all stages")
     mcp.run()

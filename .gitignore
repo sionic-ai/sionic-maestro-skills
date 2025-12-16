@@ -1,3 +1,7 @@
 *.pyc
 __pycache__/
 .DS_Store
+combined.log
+error.log
+.maestro-traces/
+.mcp.json

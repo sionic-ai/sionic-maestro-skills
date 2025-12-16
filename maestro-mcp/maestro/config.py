@@ -84,7 +84,7 @@ class MaestroConfig:
         providers = {
             "codex": ProviderConfig(
                 cmd=os.getenv("MAESTRO_CODEX_CMD", "codex"),
-                default_model=os.getenv("MAESTRO_CODEX_MODEL", "gpt-5.2-xhigh"),
+                default_model=os.getenv("MAESTRO_CODEX_MODEL", "gpt-5.1-codex-max"),
                 timeout_sec=int(os.getenv("MAESTRO_CODEX_TIMEOUT", "900")),
                 enabled=os.getenv("MAESTRO_CODEX_ENABLED", "true").lower() == "true",
             ),

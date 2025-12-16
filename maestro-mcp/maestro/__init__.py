@@ -48,6 +48,12 @@ from .coordination import (
     TaskStructureClassifier, DegradationStrategy, CoordinationPolicy,
 )
 
+# Human-in-the-Loop module
+from .human_loop import (
+    HumanLoopManager, ApprovalRequest, ApprovalStatus, StageReport,
+    ReviewQuestion, ReviewPriority, format_approval_request_for_display,
+)
+
 __all__ = [
     # Config
     "MaestroConfig",
@@ -100,4 +106,12 @@ __all__ = [
     "TaskStructureClassifier",
     "DegradationStrategy",
     "CoordinationPolicy",
+    # Human-in-the-Loop
+    "HumanLoopManager",
+    "ApprovalRequest",
+    "ApprovalStatus",
+    "StageReport",
+    "ReviewQuestion",
+    "ReviewPriority",
+    "format_approval_request_for_display",
 ]

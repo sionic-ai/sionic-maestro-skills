@@ -54,79 +54,25 @@ This project implements "measured coordination" - using multiple LLMs strategica
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Installation
+## Quick Start
 
-### Prerequisites
-
-Before installing Maestro MCP, ensure you have:
-
-1. **Python 3.10+** - Check with `python3 --version`
-2. **pip or uv** - Package manager
-3. **Claude Code CLI** - Anthropic's official CLI (`claude`)
-4. **At least one LLM CLI** (optional but recommended):
-   - OpenAI Codex CLI (`codex`)
-   - Google Gemini CLI (`gemini`)
-
-### Step 1: Clone and Setup Virtual Environment
+### 1. Install Dependencies
 
 ```bash
-# Clone the repository (if not already done)
-git clone <repository-url>
-cd sionic-mcp/maestro-mcp
-
-# Create virtual environment
-python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate  # Linux/macOS
-# or
-.venv\Scripts\activate     # Windows
-```
-
-### Step 2: Install Dependencies
-
-Using pip:
-```bash
+cd maestro-mcp
 pip install -r requirements.txt
 ```
 
-Or using uv (faster):
-```bash
-uv pip install -r requirements.txt
-```
+### 2. Configure CLI Tools
 
-### Step 3: Install LLM CLI Tools
+Ensure these are installed and in your PATH:
+- `codex` - OpenAI Codex CLI (`codex exec --model gpt-5.2-xhigh`)
+- `gemini` - Google Gemini CLI (`gemini --model gemini-3-pro-preview`)
+- `claude` - Anthropic Claude CLI (`claude -p --model opus`)
 
-#### OpenAI Codex CLI (Recommended)
-```bash
-# Install via npm
-npm install -g @openai/codex
+### 3. Register with Claude Code
 
-# Or install via pip
-pip install openai-codex
-
-# Verify installation
-codex --version
-```
-
-#### Google Gemini CLI (Optional)
-```bash
-# Install Gemini CLI
-pip install google-generativeai
-
-# Verify installation
-gemini --version
-```
-
-#### Anthropic Claude CLI (Installed with Claude Code)
-```bash
-# Usually comes with Claude Code
-claude --version
-```
-
-### Step 4: Configure MCP Server
-
-The `.mcp.json` file should be in your project root:
+The `.mcp.json` in the project root is pre-configured:
 
 ```json
 {
@@ -139,91 +85,11 @@ The `.mcp.json` file should be in your project root:
 }
 ```
 
-For global installation, add to `~/.claude/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "maestro-mcp": {
-      "command": "/path/to/maestro-mcp/.venv/bin/python",
-      "args": ["/path/to/maestro-mcp/server.py"]
-    }
-  }
-}
-```
-
-### Step 5: Verify Installation
-
+Run Claude Code and verify with `/mcp`:
 ```bash
-# Start Claude Code
 claude
-
-# Check MCP servers (inside Claude Code)
-/mcp
-
-# Should show:
-# ✓ maestro-mcp (running)
-```
-
-Test a simple tool:
-```bash
-# In Claude Code conversation
-"List available maestro providers"
-# Claude should use maestro_list_providers and show available CLIs
-```
-
-### Environment Variables (Optional)
-
-Create a `.env` file or export these variables:
-
-```bash
-# Provider Models
-export MAESTRO_CODEX_MODEL="gpt-5.1-codex-max"  # Default Codex model
-export MAESTRO_GEMINI_MODEL="gemini-3-pro-preview"
-export MAESTRO_CLAUDE_MODEL="opus"
-
-# Timeouts (seconds)
-export MAESTRO_CODEX_TIMEOUT=900
-export MAESTRO_GEMINI_TIMEOUT=600
-export MAESTRO_CLAUDE_TIMEOUT=600
-
-# Coordination Policy
-export MAESTRO_CAPABILITY_THRESHOLD=0.45
-export MAESTRO_MAX_CONSULT_PER_STAGE=2
-export MAESTRO_MAX_CONSULT_TOTAL=6
-
-# Tracing
-export MAESTRO_TRACE_DIR=".maestro-traces"
-export MAESTRO_LOG_LEVEL="INFO"
-```
-
-### Troubleshooting
-
-#### "Provider not found" Error
-```bash
-# Check if CLI is in PATH
-which codex
-which gemini
-
-# If not found, add to PATH or install
-export PATH="$PATH:/path/to/cli"
-```
-
-#### "MCP server not starting" Error
-```bash
-# Check Python path
-which python3
-
-# Run server directly to see errors
-python3 maestro-mcp/server.py
-
-# Check for import errors
-cd maestro-mcp && python -c "import server; print('OK')"
-```
-
-#### Timeout Issues
-```bash
-# Increase timeout in environment
-export MAESTRO_CODEX_TIMEOUT=1800  # 30 minutes
+# Then type: /mcp
+# Should show maestro-mcp as running
 ```
 
 ## Available Tools (34 Total)
@@ -558,128 +424,6 @@ result = maestro_apply_patch(
 # If something goes wrong, rollback
 if tests_failed:
     maestro_restore_from_backup(result["backup_session"])
-```
-
-### Human-in-the-Loop (HITL) Approval System
-
-**NEW**: Every workflow stage now requires explicit human approval before proceeding.
-
-#### Why HITL?
-
-Based on the principle: "매 stage마다 사용자의 의견을 매번 자세하게 꼼꼼히 물어보기" (Ask for detailed user feedback at every stage).
-
-- Ensures human oversight at critical decision points
-- Prevents automated mistakes from propagating
-- Collects valuable feedback for continuous improvement
-
-#### HITL Tools
-
-| Tool | Purpose |
-|------|---------|
-| `maestro_workflow_with_hitl` | Start a workflow with approval gates |
-| `maestro_run_stage_with_approval` | Run stage + auto-request approval |
-| `maestro_request_approval` | Request approval for stage outputs |
-| `maestro_submit_approval` | Submit approval decision |
-| `maestro_get_pending_approvals` | View pending approvals |
-| `maestro_get_approval_history` | Review past decisions |
-| `maestro_get_stage_questions` | Preview review questions |
-
-#### Usage Example
-
-```python
-# 1. Start HITL workflow
-result = maestro_workflow_with_hitl(
-    task="Fix authentication bug in login flow"
-)
-
-# 2. Run first stage with automatic approval request
-result = maestro_run_stage_with_approval(
-    stage="analyze",
-    task="Fix authentication bug"
-)
-# Returns detailed report with questions for review
-
-# 3. Review and submit approval
-result = maestro_submit_approval(
-    request_id=result["approval"]["request_id"],
-    approved=True,
-    feedback="Analysis looks complete",
-    question_responses={
-        "analyze_completeness": "Yes, all observations captured",
-        "analyze_accuracy": "Yes, all accurate"
-    }
-)
-# Returns: {"status": "approved", "next_action": "proceed_to_next_stage"}
-
-# 4. Continue to next stage...
-result = maestro_run_stage_with_approval(
-    stage="hypothesize",
-    task="Fix authentication bug",
-    context_facts=["User object is null at line 42", ...]
-)
-```
-
-#### Stage-Specific Review Questions
-
-Each stage has carefully designed review questions:
-
-**Analyze Stage** (5 questions):
-- 🔴 Are all observations captured?
-- 🔴 Are the facts accurate?
-- 🟠 Are affected files identified correctly?
-- 🟠 Are reproduction steps correct?
-- 🟡 Any missing invariants?
-
-**Hypothesize Stage** (5 questions):
-- 🔴 Which hypothesis is most plausible?
-- 🔴 Any missed potential causes?
-- 🟠 Are verification methods feasible?
-- 🟡 Agree with testing order?
-- 🟡 Which hypothesis is riskiest if wrong?
-
-**Implement Stage** (6 questions):
-- 🔴 Is the approach correct?
-- 🔴 Is the change scope minimal?
-- 🔴 Any potential side effects?
-- 🟠 Is verification command appropriate?
-- 🟠 Any code quality concerns?
-- 🟡 Auto-rollback on failure?
-
-**Debug Stage** (5 questions):
-- 🔴 Is error analysis correct?
-- 🔴 Continue current hypothesis or try alternative?
-- 🟠 Is proposed action appropriate?
-- 🟡 How many more iterations?
-- 🟠 Any debugging insights?
-
-**Improve Stage** (5 questions):
-- 🔴 Are improvements necessary?
-- 🟠 Which improvements to prioritize?
-- 🟠 Any improvements too risky?
-- 🟡 Are regression tests sufficient?
-- 🔴 Is code ready for merge?
-
-Legend: 🔴 Critical | 🟠 High | 🟡 Medium
-
-#### Bilingual Support
-
-All reports and questions are provided in both English and Korean:
-
-```
-============================================================
-🔍 STAGE APPROVAL REQUEST: Code Implementation
-   코드 구현 (Code Implementation)
-============================================================
-
-📋 SUMMARY / 요약
-----------------------------------------
-EN: Implementation ready. Files to modify: src/auth.py
-KO: 구현 준비 완료. 수정할 파일: src/auth.py
-
-❓ REVIEW QUESTIONS / 검토 질문
-----------------------------------------
-🔴 [CRITICAL] Is this the right approach to fix the issue?
-   이것이 문제를 해결하는 올바른 접근 방식인가요?
 ```
 
 ## Usage Examples
