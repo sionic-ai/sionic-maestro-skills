@@ -2441,7 +2441,7 @@ from maestro.human_loop import STAGE_QUESTIONS
 # ============================================================================
 
 if __name__ == "__main__":
-    logger.info("Starting Maestro MCP Server...")
+    logger.info("Starting Maestro Skills Server...")
     logger.info(f"Available providers: {registry.list_providers()}")
     logger.info(f"Trace directory: {config.tracing.trace_dir}")
     logger.info(f"Max tools per stage: {tool_registry.max_tools}")

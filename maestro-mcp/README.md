@@ -1,6 +1,8 @@
-# Maestro MCP
+# Maestro Skills
 
-A Model Context Protocol (MCP) server implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Like a maestro conducting an orchestra, Claude Code orchestrates multiple LLM models to produce harmonious, accurate output.
+A Claude Code Skill implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Like a maestro conducting an orchestra, Claude Code orchestrates multiple LLM models to produce harmonious, accurate output.
+
+> **Note**: While delivered via MCP (Model Context Protocol), this is conceptually a **Skills system** for Claude Code - providing structured workflows, human-in-the-loop approval, and multi-LLM coordination capabilities.
 
 Based on:
 - **"Towards a Science of Scaling Agent Systems"** (Kim et al., 2025)
@@ -32,7 +34,7 @@ This project implements "measured coordination" - using multiple LLMs strategica
                   │ MCP Protocol
                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Maestro MCP Server                            │
+│                    Maestro Skills Server                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
 │  │   Codex     │  │   Gemini    │  │   Claude    │  Consultants │
 │  │   (Code)    │  │  (Context)  │  │  (Review)   │  (Text only) │
@@ -83,7 +85,7 @@ make reinstall   # Clean and reinstall
 
 ### Prerequisites
 
-Before installing Maestro MCP, ensure you have:
+Before installing Maestro Skills, ensure you have:
 
 1. **Python 3.11** - Check with `python3 --version`
 2. **uv** - Fast Python package manager

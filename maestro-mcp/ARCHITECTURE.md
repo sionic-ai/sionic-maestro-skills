@@ -1,8 +1,10 @@
-# Maestro MCP - Architecture Document
+# Maestro Skills - Architecture Document
 
 ## Overview
 
-Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM coordination** for coding workflows. Like a conductor orchestrating an orchestra, it coordinates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules and **Human-in-the-Loop (HITL) approval gates**.
+Maestro Skills is a Claude Code Skill system implementing **measured multi-LLM coordination** for coding workflows. Like a conductor orchestrating an orchestra, it coordinates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules and **Human-in-the-Loop (HITL) approval gates**.
+
+> **Delivery Mechanism**: While delivered via MCP (Model Context Protocol), this is conceptually a **Skills system** - providing structured workflows, approval gates, and multi-LLM coordination as reusable capabilities for Claude Code.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -12,7 +14,7 @@ Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM
                                   │ MCP Protocol
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Maestro MCP Server                                 │
+│                         Maestro Skills Server                               │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                    Architecture Selection Engine                      │  │
 │  │  Rule A: Domain-dependent | Rule B: Decompose→MAS, Sequential→SAS   │  │

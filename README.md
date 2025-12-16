@@ -1,6 +1,6 @@
-# Maestro MCP
+# Maestro Skills
 
-A Model Context Protocol (MCP) server implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Like a maestro conducting an orchestra, Claude Code orchestrates multiple LLM models to produce harmonious, accurate output.
+A Claude Code Skill implementing **Centralized Consult** architecture for Multi-LLM coding workflows. Like a maestro conducting an orchestra, Claude Code orchestrates multiple LLM models to produce harmonious, accurate output.
 
 Based on:
 - **"Towards a Science of Scaling Agent Systems"** (Kim et al., 2025)
@@ -42,7 +42,7 @@ uv pip install -r requirements.txt
                   │ MCP Protocol
                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Maestro MCP Server                            │
+│                    Maestro Skills Server                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
 │  │   Codex     │  │   Gemini    │  │   Claude    │  Consultants │
 │  │   (Code)    │  │  (Context)  │  │  (Review)   │  (Text only) │

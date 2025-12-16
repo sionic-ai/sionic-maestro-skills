@@ -1,4 +1,4 @@
-# Maestro MCP Makefile
+# Maestro Skills Makefile
 # Use `make install` to set up the project with uv
 
 PYTHON_VERSION := 3.11
@@ -20,7 +20,7 @@ all: install
 
 # Help
 help:
-	@echo "$(GREEN)Maestro MCP - Available Commands$(NC)"
+	@echo "$(GREEN)Maestro Skills - Available Commands$(NC)"
 	@echo ""
 	@echo "  $(YELLOW)make install$(NC)     - Set up venv with Python $(PYTHON_VERSION) and install deps"
 	@echo "  $(YELLOW)make reinstall$(NC)   - Clean and reinstall everything"
@@ -57,7 +57,7 @@ deps: venv
 install: deps
 	@echo ""
 	@echo "$(GREEN)============================================$(NC)"
-	@echo "$(GREEN)  Maestro MCP installed successfully!$(NC)"
+	@echo "$(GREEN)  Maestro Skills installed successfully!$(NC)"
 	@echo "$(GREEN)============================================$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Next steps:$(NC)"
@@ -93,7 +93,7 @@ reinstall: clean install
 
 # Run the server
 run:
-	@echo "$(YELLOW)Starting Maestro MCP Server...$(NC)"
+	@echo "$(YELLOW)Starting Maestro Skills Server...$(NC)"
 	@$(PYTHON) server.py
 
 # Run tests
