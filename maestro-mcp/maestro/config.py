@@ -14,9 +14,10 @@ class ProviderConfig:
     """Configuration for a single CLI provider."""
     cmd: str
     default_model: Optional[str] = None
-    timeout_sec: int = 300
+    timeout_sec: int = 1800  # 30 minutes default (generous timeout)
     max_output_chars: int = 60000
     enabled: bool = True
+    max_no_output_sec: int = 300  # Kill if no output for 5 minutes
 
 
 @dataclass
@@ -81,24 +82,28 @@ class MaestroConfig:
     def from_env(cls) -> "MaestroConfig":
         """Load configuration from environment variables."""
 
+        # Generous timeouts by default (30 min), with liveness checking for stalls
         providers = {
             "codex": ProviderConfig(
                 cmd=os.getenv("MAESTRO_CODEX_CMD", "codex"),
                 default_model=os.getenv("MAESTRO_CODEX_MODEL", "gpt-5.1-codex-max"),
-                timeout_sec=int(os.getenv("MAESTRO_CODEX_TIMEOUT", "900")),
+                timeout_sec=int(os.getenv("MAESTRO_CODEX_TIMEOUT", "1800")),  # 30 min default
                 enabled=os.getenv("MAESTRO_CODEX_ENABLED", "true").lower() == "true",
+                max_no_output_sec=int(os.getenv("MAESTRO_CODEX_STALL_TIMEOUT", "300")),  # 5 min stall
             ),
             "gemini": ProviderConfig(
                 cmd=os.getenv("MAESTRO_GEMINI_CMD", "gemini"),
                 default_model=os.getenv("MAESTRO_GEMINI_MODEL", "gemini-3-pro-preview"),
-                timeout_sec=int(os.getenv("MAESTRO_GEMINI_TIMEOUT", "900")),  # 15 min for complex tasks
+                timeout_sec=int(os.getenv("MAESTRO_GEMINI_TIMEOUT", "1800")),  # 30 min default
                 enabled=os.getenv("MAESTRO_GEMINI_ENABLED", "true").lower() == "true",
+                max_no_output_sec=int(os.getenv("MAESTRO_GEMINI_STALL_TIMEOUT", "300")),  # 5 min stall
             ),
             "claude": ProviderConfig(
                 cmd=os.getenv("MAESTRO_CLAUDE_CMD", "claude"),
                 default_model=os.getenv("MAESTRO_CLAUDE_MODEL", "opus"),
-                timeout_sec=int(os.getenv("MAESTRO_CLAUDE_TIMEOUT", "900")),  # 15 min for Opus
+                timeout_sec=int(os.getenv("MAESTRO_CLAUDE_TIMEOUT", "1800")),  # 30 min default
                 enabled=os.getenv("MAESTRO_CLAUDE_ENABLED", "true").lower() == "true",
+                max_no_output_sec=int(os.getenv("MAESTRO_CLAUDE_STALL_TIMEOUT", "300")),  # 5 min stall
             ),
         }
 

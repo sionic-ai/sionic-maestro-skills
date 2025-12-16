@@ -292,7 +292,7 @@ def maestro_consult(
     context_errors: Optional[List[str]] = None,
     context_constraints: Optional[List[str]] = None,
     stage: Optional[str] = None,
-    timeout_sec: int = 300,
+    timeout_sec: int = 1800,  # 30 min default - generous timeout with liveness checking
 ) -> Dict[str, Any]:
     """Consult external LLM CLI as sub-agent. Call maestro_help('maestro_consult') for details."""
     # Initialize mutable defaults (Python footgun: = [] is shared between calls)
@@ -371,7 +371,7 @@ def maestro_ensemble_generate(
     context_facts: Optional[List[str]] = None,
     context_errors: Optional[List[str]] = None,
     n_per_provider: int = 1,
-    timeout_sec: int = 300,
+    timeout_sec: int = 1800,  # 30 min default - generous timeout with liveness checking
 ) -> Dict[str, Any]:
     """Generate multiple candidates using different LLMs. Call maestro_help('maestro_ensemble_generate') for details."""
     # Initialize mutable defaults
@@ -635,6 +635,7 @@ def maestro_run_stage(
     context_errors: Optional[List[str]] = None,
     providers: Optional[List[str]] = None,
     baseline_confidence: float = 0.0,
+    timeout_sec: int = 1800,  # 30 min default - generous timeout with liveness checking
 ) -> Dict[str, Any]:
     """Execute a workflow stage. Call maestro_help('maestro_run_stage') for details."""
     # Initialize mutable defaults
@@ -677,6 +678,7 @@ def maestro_run_stage(
                 context=context,
                 providers=providers,
                 baseline_confidence=baseline_confidence,
+                timeout_sec=timeout_sec,
             )
         )
     except RuntimeError:
@@ -687,6 +689,7 @@ def maestro_run_stage(
                 context=context,
                 providers=providers,
                 baseline_confidence=baseline_confidence,
+                timeout_sec=timeout_sec,
             )
         )
 
@@ -2181,6 +2184,7 @@ def maestro_run_stage_with_approval(
     context_errors: Optional[List[str]] = None,
     providers: Optional[List[str]] = None,
     baseline_confidence: float = 0.0,
+    timeout_sec: int = 1800,  # 30 min default - generous timeout with liveness checking
 ) -> Dict[str, Any]:
     """
     Execute a workflow stage AND automatically request human approval.
@@ -2232,6 +2236,7 @@ def maestro_run_stage_with_approval(
                 context=context,
                 providers=providers,
                 baseline_confidence=baseline_confidence,
+                timeout_sec=timeout_sec,
             )
         )
     except RuntimeError:
@@ -2241,6 +2246,7 @@ def maestro_run_stage_with_approval(
                 context=context,
                 providers=providers,
                 baseline_confidence=baseline_confidence,
+                timeout_sec=timeout_sec,
             )
         )
 

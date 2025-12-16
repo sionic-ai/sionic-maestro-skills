@@ -450,6 +450,7 @@ class WorkflowRunner:
         context: StageContext,
         providers: Optional[List[str]] = None,
         baseline_confidence: float = 0.0,
+        timeout_sec: Optional[int] = None,
     ) -> StageResult:
         """
         Execute a single stage of the workflow.
@@ -492,8 +493,11 @@ class WorkflowRunner:
         # Execute
         try:
             if len(providers) > 1 and policy.use_ensemble:
-                # Parallel execution for ensemble
-                requests = [{"provider": p, "prompt": prompt} for p in providers]
+                # Parallel execution for ensemble (pass timeout_sec to each request)
+                requests = [
+                    {"provider": p, "prompt": prompt, "timeout_sec": timeout_sec}
+                    for p in providers
+                ]
                 responses = await self.registry.run_parallel(requests)
                 consults_used = len(responses)
                 output = {
@@ -508,9 +512,9 @@ class WorkflowRunner:
                     ]
                 }
             else:
-                # Single provider
+                # Single provider (pass timeout_sec)
                 provider_name = providers[0] if providers else "claude"
-                response = self.registry.run(provider_name, prompt)
+                response = self.registry.run(provider_name, prompt, timeout_sec=timeout_sec)
                 consults_used = 1
                 output = {
                     "provider": response.provider,
