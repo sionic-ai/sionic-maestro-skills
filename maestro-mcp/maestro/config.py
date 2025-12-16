@@ -91,7 +91,7 @@ class MaestroConfig:
             "gemini": ProviderConfig(
                 cmd=os.getenv("MAESTRO_GEMINI_CMD", "gemini"),
                 default_model=os.getenv("MAESTRO_GEMINI_MODEL", "gemini-3-pro-preview"),
-                timeout_sec=int(os.getenv("MAESTRO_GEMINI_TIMEOUT", "600")),
+                timeout_sec=int(os.getenv("MAESTRO_GEMINI_TIMEOUT", "900")),  # 15 min for complex tasks
                 enabled=os.getenv("MAESTRO_GEMINI_ENABLED", "true").lower() == "true",
             ),
             "claude": ProviderConfig(

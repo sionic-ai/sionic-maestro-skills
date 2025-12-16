@@ -192,7 +192,7 @@ class CLIProvider(ABC):
         import time
 
         effective_model = model or self.default_model
-        effective_timeout = timeout_sec or self.timeout_sec
+        effective_timeout = max(timeout_sec or self.timeout_sec, 300)  # Minimum 300s (5 min)
 
         # Handle output schema (temp file if needed)
         schema_path = None

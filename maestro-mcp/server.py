@@ -27,6 +27,10 @@ import os
 import json
 from pathlib import Path
 
+# Enable nested event loops for MCP server compatibility
+import nest_asyncio
+nest_asyncio.apply()
+
 # Optional YAML support
 try:
     import yaml
