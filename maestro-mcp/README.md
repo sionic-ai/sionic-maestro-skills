@@ -56,42 +56,63 @@ This project implements "measured coordination" - using multiple LLMs strategica
 
 ## Installation
 
+### Quick Install (Recommended)
+
+Using `make` with `uv` (fastest):
+
+```bash
+cd maestro-mcp
+make install
+```
+
+This will:
+- Create a virtual environment with Python 3.11
+- Install all dependencies using `uv`
+- Show next steps for configuration
+
+Other useful commands:
+```bash
+make help        # Show all available commands
+make check       # Verify installation
+make verify      # Check if CLI tools are available
+make run         # Start the MCP server
+make mcp-config  # Generate MCP config for Claude Code
+make clean       # Remove venv and cache
+make reinstall   # Clean and reinstall
+```
+
 ### Prerequisites
 
 Before installing Maestro MCP, ensure you have:
 
-1. **Python 3.10+** - Check with `python3 --version`
-2. **pip or uv** - Package manager
+1. **Python 3.11** - Check with `python3 --version`
+2. **uv** - Fast Python package manager
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 3. **Claude Code CLI** - Anthropic's official CLI (`claude`)
 4. **At least one LLM CLI** (optional but recommended):
    - OpenAI Codex CLI (`codex`)
    - Google Gemini CLI (`gemini`)
 
-### Step 1: Clone and Setup Virtual Environment
+### Manual Installation
+
+If you prefer manual setup:
 
 ```bash
 # Clone the repository (if not already done)
 git clone <repository-url>
 cd sionic-mcp/maestro-mcp
 
-# Create virtual environment
-python3 -m venv .venv
+# Create virtual environment with Python 3.11
+uv venv --python 3.11 .venv
 
 # Activate virtual environment
 source .venv/bin/activate  # Linux/macOS
 # or
 .venv\Scripts\activate     # Windows
-```
 
-### Step 2: Install Dependencies
-
-Using pip:
-```bash
-pip install -r requirements.txt
-```
-
-Or using uv (faster):
-```bash
+# Install dependencies
 uv pip install -r requirements.txt
 ```
 
