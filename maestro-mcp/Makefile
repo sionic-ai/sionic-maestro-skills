@@ -82,6 +82,15 @@ install: deps
 	fi
 	@echo "$(GREEN)✓ Global MCP config updated in ~/.claude.json$(NC)"
 	@echo ""
+	@echo "$(YELLOW)Installing global slash commands to ~/.claude/commands/...$(NC)"
+	@mkdir -p ~/.claude/commands
+	@if [ -d "../.claude/commands" ]; then \
+		cp ../.claude/commands/maestro-*.md ~/.claude/commands/ 2>/dev/null || true; \
+		echo "$(GREEN)✓ Slash commands installed$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ Slash commands not found in ../.claude/commands/$(NC)"; \
+	fi
+	@echo ""
 	@echo "$(GREEN)============================================$(NC)"
 	@echo "$(GREEN)  Maestro Skills installed globally!$(NC)"
 	@echo "$(GREEN)============================================$(NC)"

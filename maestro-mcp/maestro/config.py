@@ -97,7 +97,7 @@ class MaestroConfig:
             "claude": ProviderConfig(
                 cmd=os.getenv("MAESTRO_CLAUDE_CMD", "claude"),
                 default_model=os.getenv("MAESTRO_CLAUDE_MODEL", "opus"),
-                timeout_sec=int(os.getenv("MAESTRO_CLAUDE_TIMEOUT", "600")),
+                timeout_sec=int(os.getenv("MAESTRO_CLAUDE_TIMEOUT", "900")),  # 15 min for Opus
                 enabled=os.getenv("MAESTRO_CLAUDE_ENABLED", "true").lower() == "true",
             ),
         }
