@@ -68,7 +68,7 @@ make install
 This single command will:
 1. Create a virtual environment with Python 3.11
 2. Install all dependencies using `uv`
-3. **Configure globally** in `~/.claude/mcp.json`
+3. **Configure globally** in `~/.claude.json`
 4. Make Maestro available in **all** Claude Code sessions
 
 After installation, restart Claude Code and verify:

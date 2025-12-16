@@ -57,31 +57,30 @@ deps: venv
 # Main install target (includes global MCP configuration)
 install: deps
 	@echo ""
-	@echo "$(YELLOW)Configuring global MCP server...$(NC)"
-	@mkdir -p ~/.claude
-	@if [ -f ~/.claude/mcp.json ]; then \
-		if grep -q "maestro-mcp" ~/.claude/mcp.json; then \
-			echo "$(YELLOW)maestro-mcp already in ~/.claude/mcp.json, updating...$(NC)"; \
+	@echo "$(YELLOW)Configuring global MCP server in ~/.claude.json...$(NC)"
+	@if [ -f ~/.claude.json ]; then \
+		if grep -q "maestro-mcp" ~/.claude.json; then \
+			echo "$(YELLOW)maestro-mcp already in ~/.claude.json, updating...$(NC)"; \
 			$(PYTHON) -c "import json; \
-				f=open('$(HOME)/.claude/mcp.json','r'); \
+				f=open('$(HOME)/.claude.json','r'); \
 				d=json.load(f); f.close(); \
 				d.setdefault('mcpServers',{})['maestro-mcp']={'command':'$(shell pwd)/$(VENV)/bin/python','args':['$(shell pwd)/server.py']}; \
-				f=open('$(HOME)/.claude/mcp.json','w'); \
+				f=open('$(HOME)/.claude.json','w'); \
 				json.dump(d,f,indent=2); f.close()"; \
 		else \
-			echo "$(YELLOW)Adding maestro-mcp to existing ~/.claude/mcp.json...$(NC)"; \
+			echo "$(YELLOW)Adding maestro-mcp to existing ~/.claude.json...$(NC)"; \
 			$(PYTHON) -c "import json; \
-				f=open('$(HOME)/.claude/mcp.json','r'); \
+				f=open('$(HOME)/.claude.json','r'); \
 				d=json.load(f); f.close(); \
 				d.setdefault('mcpServers',{})['maestro-mcp']={'command':'$(shell pwd)/$(VENV)/bin/python','args':['$(shell pwd)/server.py']}; \
-				f=open('$(HOME)/.claude/mcp.json','w'); \
+				f=open('$(HOME)/.claude.json','w'); \
 				json.dump(d,f,indent=2); f.close()"; \
 		fi \
 	else \
-		echo "$(YELLOW)Creating ~/.claude/mcp.json...$(NC)"; \
-		echo '{"mcpServers":{"maestro-mcp":{"command":"$(shell pwd)/$(VENV)/bin/python","args":["$(shell pwd)/server.py"]}}}' | $(PYTHON) -m json.tool > ~/.claude/mcp.json; \
+		echo "$(YELLOW)Creating ~/.claude.json...$(NC)"; \
+		echo '{"mcpServers":{"maestro-mcp":{"command":"$(shell pwd)/$(VENV)/bin/python","args":["$(shell pwd)/server.py"]}}}' | $(PYTHON) -m json.tool > ~/.claude.json; \
 	fi
-	@echo "$(GREEN)✓ Global MCP config updated$(NC)"
+	@echo "$(GREEN)✓ Global MCP config updated in ~/.claude.json$(NC)"
 	@echo ""
 	@echo "$(GREEN)============================================$(NC)"
 	@echo "$(GREEN)  Maestro Skills installed globally!$(NC)"
@@ -168,7 +167,7 @@ dev: install
 mcp-config:
 	@echo "$(YELLOW)MCP Configuration for Claude Code:$(NC)"
 	@echo ""
-	@echo "Add this to ~/.claude/mcp.json or .mcp.json:"
+	@echo "Add this to ~/.claude.json (global) or .mcp.json (project):"
 	@echo ""
 	@echo '{'
 	@echo '  "mcpServers": {'

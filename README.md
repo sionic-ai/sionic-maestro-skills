@@ -157,7 +157,7 @@ MAESTRO_MAX_CONSULT_TOTAL=6
 
 ### MCP Configuration
 
-Add to `~/.claude/mcp.json` or `.mcp.json`:
+Add to `~/.claude.json` (global) or `.mcp.json` (project):
 
 ```json
 {
