@@ -2,7 +2,7 @@
 
 ## Overview
 
-Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM coordination** for coding workflows. Like a conductor orchestrating an orchestra, it coordinates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules.
+Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM coordination** for coding workflows. Like a conductor orchestrating an orchestra, it coordinates Claude, Codex, and Gemini CLIs through a 5-stage problem-solving pipeline with paper-backed collaboration rules and **Human-in-the-Loop (HITL) approval gates**.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -19,14 +19,21 @@ Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM
 │  │  Rule C: Overhead as cost | Rule D: Calibration required             │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                 Human-in-the-Loop (HITL) System                       │  │
+│  │  Stage Reports | Review Questions | Approval Gates | Feedback Loop   │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                        │
 │  │   Codex     │  │   Gemini    │  │   Claude    │  CLI Providers         │
 │  │   (Code)    │  │  (Context)  │  │  (Review)   │  (Text only)           │
 │  └─────────────┘  └─────────────┘  └─────────────┘                        │
 │                                                                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │  5-Stage Workflow Engine (FSM)                                        │  │
-│  │  Analyze → Hypothesize → Implement → Debug → Improve                  │  │
+│  │  5-Stage Workflow Engine (FSM) + Approval Gates                       │  │
+│  │  Analyze ──► Hypothesize ──► Implement ──► Debug ──► Improve          │  │
+│  │      ↓           ↓              ↓           ↓          ↓              │  │
+│  │   [HITL]      [HITL]         [HITL]      [HITL]     [HITL]            │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
@@ -56,7 +63,17 @@ Maestro MCP is a Model Context Protocol server implementing **measured multi-LLM
 
 - "More agents = better" is explicitly rejected
 - Long-term memory/personalization (optional, off by default)
-- Fully autonomous operation (human-in-the-loop for critical decisions)
+- Fully autonomous operation without oversight
+
+### Human-in-the-Loop Principle
+
+Based on: **"매 stage마다 사용자의 의견을 매번 자세하게 꼼꼼히 물어보기"**
+(Ask for detailed user feedback at every stage)
+
+Every workflow stage requires explicit human approval before proceeding:
+- Prevents automated mistakes from propagating
+- Ensures human oversight at critical decision points
+- Collects feedback for continuous improvement
 
 ---
 
@@ -330,6 +347,105 @@ class WorkspaceManager:
         # 5. Return backup_session for rollback
 ```
 
+### 8. Human-in-the-Loop System (`maestro/human_loop.py`)
+
+Approval gate system requiring human review at each stage.
+
+#### Core Components
+
+```python
+class HumanLoopManager:
+    """Thread-safe approval manager with memory-safe history."""
+
+    pending_requests: Dict[str, ApprovalRequest]  # Awaiting approval
+    completed_requests: Deque[ApprovalRequest]    # maxlen=100 (no memory leak)
+    _lock: threading.Lock                          # Thread safety
+
+    def request_approval(stage, outputs, duration_ms) -> ApprovalRequest
+    def submit_approval(request_id, approved, feedback) -> Dict
+    def get_pending_requests() -> List[Dict]
+    def get_approval_history() -> List[Dict]
+```
+
+#### Stage Reports
+
+Each stage completion generates a comprehensive bilingual report:
+
+```python
+@dataclass
+class StageReport:
+    stage: str
+    stage_display_name: str
+    stage_display_name_ko: str      # Korean translation
+    summary: str
+    summary_ko: str
+    outputs: Dict[str, Any]
+    key_findings: List[str]
+    key_findings_ko: List[str]
+    risks: List[str]
+    risks_ko: List[str]
+    questions: List[ReviewQuestion]  # Priority-based
+    next_stage: Optional[str]
+    next_stage_preview: str
+    next_stage_preview_ko: str
+```
+
+#### Review Questions
+
+Stage-specific questions with priority levels:
+
+```python
+class ReviewPriority(Enum):
+    CRITICAL = "critical"  # 🔴 Must review before proceeding
+    HIGH = "high"          # 🟠 Strongly recommended
+    MEDIUM = "medium"      # 🟡 Review if time permits
+    LOW = "low"            # 🟢 Optional
+
+# Questions per stage
+STAGE_QUESTIONS = {
+    "analyze": [
+        {"id": "analyze_completeness", "priority": CRITICAL, ...},
+        {"id": "analyze_accuracy", "priority": CRITICAL, ...},
+        # ... 5 questions total
+    ],
+    "hypothesize": [...],  # 5 questions
+    "implement": [...],    # 6 questions (most critical stage)
+    "debug": [...],        # 5 questions
+    "improve": [...],      # 5 questions
+}
+```
+
+#### Approval Flow
+
+```
+Stage Execution
+      │
+      ▼
+┌─────────────────┐
+│ Generate Report │ ← Outputs, findings, risks, questions
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Request Approval│ ← maestro_request_approval()
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Human Review   │ ← Review report, answer questions
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌───────┐  ┌──────────┐
+│Approve│  │  Reject  │
+└───┬───┘  └────┬─────┘
+    │           │
+    ▼           ▼
+ Next Stage   Stop/Revise
+```
+
 ---
 
 ## 5-Stage Workflow
@@ -452,61 +568,71 @@ for iteration in range(5):
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                     1. Task Classification                                │
-│  maestro_classify_task() → TaskStructureFeatures                             │
+│  maestro_classify_task() → TaskStructureFeatures                          │
 │  (decomposability, sequential_dependency, tool_complexity)               │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   2. Architecture Selection                               │
-│  maestro_select_architecture() → CoordinationTopology                        │
+│  maestro_select_architecture() → CoordinationTopology                     │
 │  (sas | mas_independent | mas_centralized)                               │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                    3. Dynamic Tool Loading                                │
-│  maestro_enter_stage() → Load stage-specific tools                           │
+│  maestro_enter_stage() → Load stage-specific tools                        │
 │  (minimize context overhead)                                              │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    4. Stage Execution                                     │
+│              4. Stage Execution with HITL Approval Gates                  │
 │                                                                           │
-│  ┌─────────────┐                                                         │
-│  │   Analyze   │──► Observations, Task Structure                         │
-│  └──────┬──────┘                                                         │
-│         ▼                                                                 │
-│  ┌─────────────┐                                                         │
-│  │ Hypothesize │──► Ranked Hypotheses                                    │
-│  └──────┬──────┘     (parallel generation if MAS)                        │
-│         ▼                                                                 │
-│  ┌─────────────┐                                                         │
-│  │  Implement  │──► Patch Candidates                                     │
-│  └──────┬──────┘     (parallel gen → test selection)                     │
-│         ▼                                                                 │
-│  ┌─────────────┐                                                         │
-│  │    Debug    │──► Fixed Code (SAS ONLY)                                │
-│  └──────┬──────┘     (sequential, max 5 iterations)                      │
-│         ▼                                                                 │
-│  ┌─────────────┐                                                         │
-│  │   Improve   │──► Skill Templates, Policy Updates                      │
-│  └─────────────┘                                                         │
+│  ┌─────────────┐     ┌──────────┐                                        │
+│  │   Analyze   │──►  │  [HITL]  │──► Approval Required                   │
+│  └─────────────┘     └────┬─────┘                                        │
+│                           │ ✓ Approved                                    │
+│                           ▼                                               │
+│  ┌─────────────┐     ┌──────────┐                                        │
+│  │ Hypothesize │──►  │  [HITL]  │──► Approval Required                   │
+│  └─────────────┘     └────┬─────┘                                        │
+│                           │ ✓ Approved                                    │
+│                           ▼                                               │
+│  ┌─────────────┐     ┌──────────┐                                        │
+│  │  Implement  │──►  │  [HITL]  │──► Approval Required                   │
+│  └─────────────┘     └────┬─────┘                                        │
+│                           │ ✓ Approved                                    │
+│                           ▼                                               │
+│  ┌─────────────┐     ┌──────────┐                                        │
+│  │    Debug    │──►  │  [HITL]  │──► Approval Required (SAS ONLY)        │
+│  └─────────────┘     └────┬─────┘                                        │
+│                           │ ✓ Approved                                    │
+│                           ▼                                               │
+│  ┌─────────────┐     ┌──────────┐                                        │
+│  │   Improve   │──►  │  [HITL]  │──► Final Approval                      │
+│  └─────────────┘     └──────────┘                                        │
+│                                                                           │
+│  HITL Components:                                                         │
+│  • Stage Report (bilingual EN/KO)                                         │
+│  • Review Questions (Critical/High/Medium/Low priority)                   │
+│  • Approval/Rejection with feedback                                       │
+│  • Revision instructions if rejected                                      │
 │                                                                           │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   5. Degradation Check                                    │
-│  maestro_check_degradation() → Fallback if needed                            │
+│  maestro_check_degradation() → Fallback if needed                         │
 │  (overhead, error_amplification, redundancy)                             │
 └────────────────────────────────┬─────────────────────────────────────────┘
                                  │
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                   6. Calibration Recording                                │
-│  maestro_record_coordination_result() → Update topology stats                │
+│  maestro_record_coordination_result() → Update topology stats             │
 │  (for future architecture selection)                                     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -585,7 +711,18 @@ for iteration in range(5):
 | `maestro_get_coordination_stats` | View statistics |
 | `maestro_get_stage_strategy` | Get stage strategy |
 
-**Total: 34 tools**
+### Human-in-the-Loop (7)
+| Tool | Purpose |
+|------|---------|
+| `maestro_workflow_with_hitl` | Start HITL workflow |
+| `maestro_run_stage_with_approval` | Run stage + request approval |
+| `maestro_request_approval` | Request human approval |
+| `maestro_submit_approval` | Submit approval decision |
+| `maestro_get_pending_approvals` | View pending approvals |
+| `maestro_get_approval_history` | Review past decisions |
+| `maestro_get_stage_questions` | Preview review questions |
+
+**Total: 41 tools**
 
 ---
 
@@ -596,7 +733,7 @@ for iteration in range(5):
 ```bash
 # Provider configuration
 MAESTRO_CODEX_CMD=codex
-MAESTRO_CODEX_MODEL=gpt-5.2-xhigh
+MAESTRO_CODEX_MODEL=gpt-5.1-codex-max
 MAESTRO_CODEX_TIMEOUT=900
 
 MAESTRO_GEMINI_CMD=gemini
@@ -678,6 +815,12 @@ coordination:
 - Debug loop > 5 iterations → Human review
 - All candidates red-flagged → Human input
 - Security-sensitive files → Explicit approval
+
+### Human-in-the-Loop Gates
+- Every stage completion → Approval required before proceeding
+- Rejection → Workflow stops or requests revision
+- Feedback collected → Incorporated into next iteration
+- History tracked → For audit and calibration
 
 ---
 
