@@ -55,6 +55,32 @@ uv pip install -r requirements.txt
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## How to Use Maestro Skills
+
+### Method 1: Explicit Request
+Simply mention "maestro" in your request:
+```
+"Use maestro to debug this authentication bug"
+"Debug this with maestro and get approval at each step"
+"Ask codex using maestro what it thinks about this code"
+```
+
+### Method 2: Slash Commands
+Use the built-in slash commands:
+```
+/maestro-debug Fix the login bug in auth.py
+/maestro-analyze Review the payment processing code
+/maestro-consult What's the best way to handle this error?
+/maestro-workflow Implement user session management
+```
+
+### Method 3: Direct Tool Calls
+Call Maestro tools directly in conversation:
+```
+"Call maestro_workflow_with_hitl to start debugging"
+"Use maestro_consult with codex to get a second opinion"
+```
+
 ## Human-in-the-Loop (HITL) Workflow
 
 Every workflow stage requires explicit human approval before proceeding:

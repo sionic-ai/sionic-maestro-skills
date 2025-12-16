@@ -1,15 +1,103 @@
-# Maestro MCP - Installation & Usage Guide
+# Maestro Skills - Installation & Usage Guide
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Installation](#installation)
-3. [Configuration](#configuration)
-4. [Quick Start](#quick-start)
-5. [Usage Examples](#usage-examples)
-6. [Workflow Patterns](#workflow-patterns)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting](#troubleshooting)
+1. [How to Invoke Maestro](#how-to-invoke-maestro)
+2. [Slash Commands](#slash-commands)
+3. [Prerequisites](#prerequisites)
+4. [Installation](#installation)
+5. [Configuration](#configuration)
+6. [Quick Start](#quick-start)
+7. [Human-in-the-Loop (HITL)](#human-in-the-loop-hitl)
+8. [Usage Examples](#usage-examples)
+9. [Workflow Patterns](#workflow-patterns)
+10. [Best Practices](#best-practices)
+11. [Troubleshooting](#troubleshooting)
+
+---
+
+## How to Invoke Maestro
+
+Maestro Skills is **not automatically invoked**. You must explicitly request it.
+
+### Method 1: Keyword Triggers
+
+Include these keywords in your request:
+
+| Keyword | Example |
+|---------|---------|
+| "maestro" | "Use maestro to fix this bug" |
+| "multi-llm" | "Get multi-llm opinions on this code" |
+| "HITL" / "approval" | "Debug with HITL approval at each step" |
+| "workflow" | "Run the full workflow on this task" |
+
+### Method 2: Slash Commands
+
+```
+/maestro-debug <description>     Debug with full HITL workflow
+/maestro-analyze <description>   Analyze code/issue only
+/maestro-consult <question>      Ask another LLM
+/maestro-workflow <description>  Run complete 5-stage workflow
+```
+
+### Method 3: Direct Tool Calls
+
+```
+"Call maestro_workflow_with_hitl for this task"
+"Use maestro_consult to ask codex about this"
+```
+
+### When Maestro is NOT Invoked
+
+- Simple file edits without "maestro" keyword
+- Quick questions
+- Tasks that don't mention maestro keywords
+- Regular coding tasks
+
+---
+
+## Slash Commands
+
+### /maestro-debug
+
+**Purpose**: Debug an issue using the full HITL workflow.
+
+**Usage**:
+```
+/maestro-debug Fix the authentication bug where users can't log in
+```
+
+**What happens**:
+1. Initializes HITL workflow
+2. Runs each stage (analyze → hypothesize → implement → debug → improve)
+3. Waits for your approval after each stage
+
+### /maestro-analyze
+
+**Purpose**: Analyze code or an issue without making changes.
+
+**Usage**:
+```
+/maestro-analyze Review the payment processing logic in checkout.py
+```
+
+### /maestro-consult
+
+**Purpose**: Get opinions from other LLMs.
+
+**Usage**:
+```
+/maestro-consult What's the best way to implement caching here?
+```
+
+### /maestro-workflow
+
+**Purpose**: Run the complete 5-stage workflow.
+
+**Usage**:
+```
+/maestro-workflow Implement user session timeout feature
+```
 
 ---
 
@@ -111,7 +199,7 @@ claude
 
 # Codex (OpenAI)
 MAESTRO_CODEX_CMD=codex
-MAESTRO_CODEX_MODEL=gpt-5.2-xhigh
+MAESTRO_CODEX_MODEL=gpt-5.1-codex-max
 MAESTRO_CODEX_TIMEOUT=900
 
 # Gemini (Google)
@@ -207,6 +295,74 @@ You: Debug the failing test in tests/auth.test.js using the maestro workflow
 Claude: I'll follow the 5-stage workflow to debug this.
 [Uses maestro_enter_stage, maestro_classify_task, etc.]
 ```
+
+---
+
+## Human-in-the-Loop (HITL)
+
+### What is HITL?
+
+Every workflow stage requires your explicit approval before proceeding. This ensures:
+- Human oversight at critical decision points
+- Mistakes don't propagate through stages
+- Your feedback is collected and incorporated
+
+### The Approval Flow
+
+```
+Stage Execution
+      ↓
+Generate Report (findings, risks, questions)
+      ↓
+Request Your Approval
+      ↓
+You Review & Respond
+      ↓
+┌─────┴─────┐
+│           │
+Approve   Reject
+│           │
+↓           ↓
+Next      Stop or
+Stage     Revise
+```
+
+### How to Approve
+
+After each stage, you'll see a report with review questions. Respond with:
+
+**To approve**:
+```
+"Approved. The analysis looks complete."
+"Yes, proceed to the next stage."
+```
+
+**To reject**:
+```
+"Rejected. Please also check the database connection logic."
+"No, this needs more work."
+```
+
+**To request revision**:
+```
+"Needs revision. Focus on the null pointer exception first."
+```
+
+### Stage Report Contents
+
+Each report includes:
+- **Summary** - What the stage accomplished
+- **Key Findings** - Important discoveries
+- **Risks** - Potential issues identified
+- **Review Questions** - Priority-based questions for you to answer
+- **Next Stage Preview** - What comes next if approved
+
+### Priority Levels for Questions
+
+- 🔴 **Critical** - Must review before proceeding
+- 🟠 **High** - Strongly recommended to review
+- 🟡 **Medium** - Review if time permits
+- 🟢 **Low** - Optional
 
 ---
 
