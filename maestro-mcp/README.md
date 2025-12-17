@@ -111,7 +111,7 @@ If you prefer manual setup:
 ```bash
 # Clone the repository (if not already done)
 git clone <repository-url>
-cd sionic-mcp/maestro-mcp
+cd sionic-maestro-skills/maestro-mcp
 
 # Create virtual environment with Python 3.11
 uv venv --python 3.11 .venv
